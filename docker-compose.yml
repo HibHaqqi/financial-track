@@ -12,7 +12,8 @@ services:
       - PORT=3000                 # internal container port used by Next.js
     depends_on:
       - postgres
-
+# --- ADD THIS COMMAND SECTION BACK ---
+   # command: sh -c "npx prisma migrate deploy && npm start"
   postgres:
     image: postgres:15
     restart: always
