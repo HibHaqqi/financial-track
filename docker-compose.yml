@@ -1,24 +1,20 @@
 version: '3.8'
 
 services:
-  web:
-    build: .
+  financetrack-web:
+    container_name: financetrack-web
+    build: .   # Adjust path to your financetrack app
     ports:
-      - "${HOST_PORT}:3000"        # ← reads HOST_PORT from .env
+      - "${HOST_PORT}:3000"
     env_file:
-      - ./.env                    # ← injects every variable into the container
-    environment:                  # optional – you can override or add extra vars here
-      - HOST=0.0.0.0              # make Next.js listen on all interfaces
-      - PORT=3000                 # internal container port used by Next.js
-    depends_on:
-      - postgres
-# --- ADD THIS COMMAND SECTION BACK ---
-   # command: sh -c "npx prisma migrate deploy && npm start"
-  postgres:
-    image: postgres:15
-    restart: always
-    env_file:
-      - ./.env                    # same .env supplies POSTGRES_* vars
-    ports:
-      - "5433:5432"
+      - ./.env
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3000
+    networks:
+      - biztrackkos-2_default
+
+networks:
+  biztrackkos-2_default:
+    external: true
 
