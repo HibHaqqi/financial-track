@@ -1,27 +1,29 @@
-# Use an official Node.js runtime as a parent image
+# Use Node.js 20 Alpine
 FROM node:20-alpine
 
-# Set the working directory
+# Set working directory
 WORKDIR /usr/src/app
 
-# Copy package.json and package-lock.json
+# Install dependencies for Prisma
+RUN apk add --no-cache openssl
+
+# Copy package files
 COPY package*.json ./
 
-# Install app dependencies
+# Install dependencies
 RUN npm install
 
-# Copy app source
+# Copy application source
 COPY . .
 
-# Generate Prisma client
+# Generate Prisma Client
 RUN npx prisma generate
 
-
-# Build the app
+# Build the application
 RUN npm run build
 
-# Expose port 3000
+# Expose port
 EXPOSE 3000
 
-# Start the app
+# Start the application
 CMD ["npm", "start"]
