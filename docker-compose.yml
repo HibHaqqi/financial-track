@@ -3,43 +3,44 @@ services:
     container_name: financetrack-web
     build: .
     ports:
-      - "${HOST_PORT:-3000}:3000"
+      - "${HOST_PORT}:3000"
     env_file:
-      - .env
+      - ./.env
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       - HOST=0.0.0.0
       - PORT=3000
-    depends_on:
-      - db
     restart: unless-stopped
     networks:
-      - financetrack-network
+      - biztrackkos-2_default
 
-  db:
-    container_name: financetrack-db
-    image: postgres:15
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - financetrack-network
-
-volumes:
-  pgdata:
+# Optional: PostgreSQL database service
+# Uncomment this section if you want to run a separate database for FinanceTrack
+# Otherwise, it will use the external database from biztrackkos-2
+#
+#  db:
+#    container_name: financetrack-db
+#    image: postgres:15
+#    environment:
+#      - POSTGRES_USER=${POSTGRES_USER}
+#      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+#      - POSTGRES_DB=${POSTGRES_DB}
+#    volumes:
+#      - pgdata:/var/lib/postgresql/data
+#    ports:
+#      - "${POSTGRES_PORT:-5432}:5432"
+#    restart: unless-stopped
+#    healthcheck:
+#      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5
+#    networks:
+#      - biztrackkos-2_default
+#
+# volumes:
+#   pgdata:
 
 networks:
-  financetrack-network:
-    driver: bridge
+  biztrackkos-2_default:
+    external: true
 

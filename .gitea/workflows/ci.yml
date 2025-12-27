@@ -34,25 +34,19 @@ jobs:
           echo "Step 2: Stopping running containers..."
           docker compose down || true
 
-          echo "Step 3: Starting database container..."
-          docker compose up -d db
-
-          echo "Step 4: Waiting for database to be ready..."
-          sleep 10
-
-          echo "Step 5: Running database migrations..."
+          echo "Step 3: Running database migrations..."
           docker compose run --rm financetrack-web npx prisma db push
 
-          echo "Step 6: Building and starting application..."
+          echo "Step 4: Building and starting application..."
           docker compose up -d --build --force-recreate
 
-          echo "Step 7: Waiting for application to be healthy..."
+          echo "Step 5: Waiting for application to be healthy..."
           sleep 15
 
-          echo "Step 8: Checking container status..."
+          echo "Step 6: Checking container status..."
           docker compose ps
 
-          echo "Step 9: Showing recent logs..."
+          echo "Step 7: Showing recent logs..."
           docker compose logs --tail=50 financetrack-web
 
           echo "=== Deployment Complete ==="
