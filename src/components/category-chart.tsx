@@ -35,8 +35,8 @@ export default function CategoryChart({ transactions, categories }: CategoryChar
     })
     .filter((item) => item.value > 0);
 
-  const chartHeight = isMobile ? 250 : 400;
-  const outerRadius = isMobile ? 80 : 120;
+  const chartHeight = isMobile ? 200 : 400;
+  const outerRadius = isMobile ? 70 : 120;
 
   return (
     <Card className="h-full">

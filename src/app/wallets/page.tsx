@@ -19,7 +19,7 @@ export default async function WalletsPage() {
   return (
     <div className="flex min-h-screen w-full flex-col">
       <Header />
-      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 pb-20 sm:pb-4 md:pb-8">
+      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 pb-28 md:pb-8">
         <WalletsClient wallets={wallets} transactions={transactions} categories={categories} userId={session.user.id} />
       </main>
       <MobileBottomNav />

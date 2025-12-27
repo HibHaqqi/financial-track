@@ -43,13 +43,13 @@ export function MobileBottomNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 safe-area-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <style jsx>{`
         .safe-area-bottom {
-          padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+          padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
         }
       `}</style>
-      <div className="grid h-16 grid-cols-5 items-center max-w-screen-2xl mx-auto">
+      <div className="grid h-14 grid-cols-5 items-center max-w-screen-2xl mx-auto safe-area-bottom">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;

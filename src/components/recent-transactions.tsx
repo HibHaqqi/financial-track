@@ -86,35 +86,35 @@ export default function RecentTransactions({
   // Mobile card layout
   if (isMobile) {
     return (
-      <Card className="h-full">
-        <CardHeader>
-          <CardTitle>Recent Transactions</CardTitle>
+      <Card className="h-full overflow-hidden">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Recent Transactions</CardTitle>
         </CardHeader>
-        <CardContent>
-          <ScrollArea className="h-[400px]">
-            <div className="space-y-3">
+        <CardContent className="p-0">
+          <ScrollArea className="h-[300px] px-4">
+            <div className="space-y-3 pb-4">
               {sortedTransactions.length > 0 ? (
                 sortedTransactions.map((tx) => (
-                  <Card key={tx.id} className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <Card key={tx.id} className="p-3 w-full">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2 flex-1 min-w-0">
                         {tx.type === 'income' ? (
-                          <ArrowUpCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-1" />
+                          <ArrowUpCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
                         ) : (
-                          <ArrowDownCircle className="h-6 w-6 text-red-500 flex-shrink-0 mt-1" />
+                          <ArrowDownCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
                         )}
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-base truncate">{tx.description}</div>
-                          <div className="text-xs text-muted-foreground mt-1">
+                          <div className="font-medium text-sm truncate">{tx.description}</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
                             {new Date(tx.date).toLocaleDateString()}
                           </div>
-                          <div className="mt-2">
+                          <div className="mt-1.5">
                             <Badge variant="outline" className="text-xs">
                               {getCategoryName(tx.categoryId)}
                             </Badge>
                           </div>
                           <div
-                            className={`text-lg font-bold mt-2 ${
+                            className={`text-base font-bold mt-1.5 ${
                               tx.type === 'income' ? 'text-green-600' : 'text-red-600'
                             }`}
                           >
@@ -123,10 +123,10 @@ export default function RecentTransactions({
                           </div>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-2 flex-shrink-0">
+                      <div className="flex flex-col gap-1 flex-shrink-0">
                         <Dialog open={dialogOpen[tx.id]} onOpenChange={(open) => handleDialogChange(tx.id, open)}>
                           <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-10 w-10">
+                            <Button variant="ghost" size="icon" className="h-9 w-9">
                               <Edit className="h-4 w-4" />
                             </Button>
                           </DialogTrigger>
@@ -147,7 +147,7 @@ export default function RecentTransactions({
                         </Dialog>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-10 w-10 text-red-500 hover:text-red-600">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 text-red-500 hover:text-red-600">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
@@ -169,7 +169,7 @@ export default function RecentTransactions({
                   </Card>
                 ))
               ) : (
-                <div className="text-center text-muted-foreground py-8">
+                <div className="text-center text-muted-foreground py-8 text-sm">
                   No transactions for this period.
                 </div>
               )}

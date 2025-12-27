@@ -143,12 +143,12 @@ export default function DashboardClient({
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <SummaryCard title="Total Income" value={totalIncome} iconName="TrendingUp" />
         <SummaryCard title="Total Expenses" value={totalExpenses} iconName="TrendingDown" />
         <SummaryCard title="Overall Balance" value={balance} iconName="Wallet" />
       </div>
-      
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
           <BalanceChart transactions={allTimeTransactions} />
           <CategoryChart transactions={filteredTransactions} categories={categories} />

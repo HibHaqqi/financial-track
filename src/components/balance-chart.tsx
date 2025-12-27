@@ -34,7 +34,7 @@ export default function BalanceChart({ transactions }: BalanceChartProps) {
     return Object.values(monthlyData).sort((a, b) => a.date.getTime() - b.date.getTime());
   }, [transactions]);
 
-  const chartHeight = isMobile ? 250 : 400;
+  const chartHeight = isMobile ? 200 : 400;
 
   return (
     <Card className="h-full">

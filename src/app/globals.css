@@ -71,6 +71,16 @@ body {
   }
 }
 
+/* Prevent horizontal overflow on mobile */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+* {
+  max-width: 100%;
+}
+
 /* Support for safe area insets on mobile devices */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   .pb-safe {

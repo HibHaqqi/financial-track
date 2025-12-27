@@ -12,7 +12,7 @@ export default async function DashboardPage() {
   return (
     <div className="flex min-h-screen w-full flex-col">
       <Header />
-      <main className="flex-1 p-4 sm:p-6 md:p-8 pb-20 sm:pb-6 md:pb-8">
+      <main className="flex-1 p-4 sm:p-6 md:p-8 pb-28 md:pb-8">
         <DashboardClient
           transactions={transactions}
           wallets={wallets}

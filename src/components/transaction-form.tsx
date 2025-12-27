@@ -359,7 +359,7 @@ export default function TransactionForm({ wallets, categories, transaction, onSu
           )}
         />
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
+        <Button type="submit" className="w-full mb-4 sm:mb-0" size="lg" disabled={isSubmitting}>
           {isSubmitting ? <Loader2 className="animate-spin" /> : (isEditMode ? 'Update Transaction' : 'Add Transaction')}
         </Button>
       </form>
