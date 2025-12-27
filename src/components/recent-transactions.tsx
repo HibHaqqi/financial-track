@@ -56,7 +56,7 @@ export default function RecentTransactions({
 
   const getCategoryName = (id: string) =>
     categories.find((c) => c.id === id)?.name || 'N/A';
-  
+
   const sortedTransactions = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const handleDelete = async (id: string) => {
@@ -86,35 +86,35 @@ export default function RecentTransactions({
   // Mobile card layout
   if (isMobile) {
     return (
-      <Card className="h-full overflow-hidden">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Recent Transactions</CardTitle>
+      <Card className="h-full">
+        <CardHeader className="pb-3 px-3 pt-3">
+          <CardTitle className="text-sm">Recent Transactions</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <ScrollArea className="h-[300px] px-4">
-            <div className="space-y-3 pb-4">
+          <ScrollArea className="h-[300px]">
+            <div className="px-3 space-y-2 pb-4">
               {sortedTransactions.length > 0 ? (
                 sortedTransactions.map((tx) => (
-                  <Card key={tx.id} className="p-3 w-full">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2 flex-1 min-w-0">
+                  <Card key={tx.id} className="p-2">
+                    <div className="flex items-start gap-2">
+                      <div className="flex items-start gap-1.5 flex-1 min-w-0">
                         {tx.type === 'income' ? (
-                          <ArrowUpCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                          <ArrowUpCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
                         ) : (
-                          <ArrowDownCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                          <ArrowDownCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
                         )}
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm truncate">{tx.description}</div>
-                          <div className="text-xs text-muted-foreground mt-0.5">
+                          <div className="font-medium text-xs truncate">{tx.description}</div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
                             {new Date(tx.date).toLocaleDateString()}
                           </div>
-                          <div className="mt-1.5">
-                            <Badge variant="outline" className="text-xs">
+                          <div className="mt-1">
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                               {getCategoryName(tx.categoryId)}
                             </Badge>
                           </div>
                           <div
-                            className={`text-base font-bold mt-1.5 ${
+                            className={`text-sm font-bold mt-1 ${
                               tx.type === 'income' ? 'text-green-600' : 'text-red-600'
                             }`}
                           >
@@ -123,11 +123,11 @@ export default function RecentTransactions({
                           </div>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-1 flex-shrink-0">
+                      <div className="flex flex-col gap-0.5 shrink-0 ml-1">
                         <Dialog open={dialogOpen[tx.id]} onOpenChange={(open) => handleDialogChange(tx.id, open)}>
                           <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-9 w-9">
-                              <Edit className="h-4 w-4" />
+                            <Button variant="ghost" size="icon" className="h-8 w-8 p-0">
+                              <Edit className="h-3.5 w-3.5" />
                             </Button>
                           </DialogTrigger>
                           <DialogContent className="max-w-md">
@@ -147,16 +147,16 @@ export default function RecentTransactions({
                         </Dialog>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-9 w-9 text-red-500 hover:text-red-600">
-                              <Trash2 className="h-4 w-4" />
+                            <Button variant="ghost" size="icon" className="h-8 w-8 p-0 text-red-500 hover:text-red-600">
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
                               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete this transaction.
-                              </AlertDialogDescription>
+                              This action cannot be undone. This will permanently delete this transaction.
+                            </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -169,7 +169,7 @@ export default function RecentTransactions({
                   </Card>
                 ))
               ) : (
-                <div className="text-center text-muted-foreground py-8 text-sm">
+                <div className="text-center text-muted-foreground py-8 text-xs">
                   No transactions for this period.
                 </div>
               )}
