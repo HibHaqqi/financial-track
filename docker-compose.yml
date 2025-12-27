@@ -1,6 +1,6 @@
 services:
-  financetrack-web:
-    container_name: financetrack-web
+  financetrack:
+    container_name: financetrack
     build: .
     ports:
       - "${HOST_PORT}:3000"

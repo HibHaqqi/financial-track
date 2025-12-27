@@ -35,7 +35,7 @@ jobs:
           docker compose down || true
 
           echo "Step 3: Running database migrations..."
-          docker compose run --rm financetrack-web npx prisma db push
+          docker compose run --rm financetrack npx prisma db push
 
           echo "Step 4: Building and starting application..."
           docker compose up -d --build --force-recreate
@@ -47,7 +47,7 @@ jobs:
           docker compose ps
 
           echo "Step 7: Showing recent logs..."
-          docker compose logs --tail=50 financetrack-web
+          docker compose logs --tail=50 financetrack
 
           echo "=== Deployment Complete ==="
           echo "Application should be available at http://${{ secrets.APP_URL }}"
