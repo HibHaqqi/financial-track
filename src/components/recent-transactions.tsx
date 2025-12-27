@@ -36,6 +36,7 @@ import {
 import TransactionForm from './transaction-form';
 import { deleteTransaction } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 interface RecentTransactionsProps {
@@ -50,6 +51,7 @@ export default function RecentTransactions({
   wallets,
 }: RecentTransactionsProps) {
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [dialogOpen, setDialogOpen] = useState<Record<string, boolean>>({});
 
   const getCategoryName = (id: string) =>
@@ -81,6 +83,104 @@ export default function RecentTransactions({
     handleDialogChange(txId, false);
   }
 
+  // Mobile card layout
+  if (isMobile) {
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <CardTitle>Recent Transactions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea className="h-[400px]">
+            <div className="space-y-3">
+              {sortedTransactions.length > 0 ? (
+                sortedTransactions.map((tx) => (
+                  <Card key={tx.id} className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        {tx.type === 'income' ? (
+                          <ArrowUpCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-1" />
+                        ) : (
+                          <ArrowDownCircle className="h-6 w-6 text-red-500 flex-shrink-0 mt-1" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-base truncate">{tx.description}</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {new Date(tx.date).toLocaleDateString()}
+                          </div>
+                          <div className="mt-2">
+                            <Badge variant="outline" className="text-xs">
+                              {getCategoryName(tx.categoryId)}
+                            </Badge>
+                          </div>
+                          <div
+                            className={`text-lg font-bold mt-2 ${
+                              tx.type === 'income' ? 'text-green-600' : 'text-red-600'
+                            }`}
+                          >
+                            {tx.type === 'income' ? '+' : '-'}
+                            {new Intl.NumberFormat('id-ID').format(tx.amount)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2 flex-shrink-0">
+                        <Dialog open={dialogOpen[tx.id]} onOpenChange={(open) => handleDialogChange(tx.id, open)}>
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-10 w-10">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-md">
+                            <DialogHeader>
+                              <DialogTitle>Edit Transaction</DialogTitle>
+                              <DialogDescription>
+                                Update the details of your transaction.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <TransactionForm
+                              wallets={wallets}
+                              categories={categories}
+                              transaction={tx}
+                              onSuccess={() => handleFormSuccess(tx.id)}
+                            />
+                          </DialogContent>
+                        </Dialog>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-10 w-10 text-red-500 hover:text-red-600">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete this transaction.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(tx.id)}>Delete</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </div>
+                  </Card>
+                ))
+              ) : (
+                <div className="text-center text-muted-foreground py-8">
+                  No transactions for this period.
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Desktop table layout
   return (
     <Card className="h-full">
       <CardHeader>
@@ -143,9 +243,9 @@ export default function RecentTransactions({
                               Update the details of your transaction.
                             </DialogDescription>
                           </DialogHeader>
-                          <TransactionForm 
-                            wallets={wallets} 
-                            categories={categories} 
+                          <TransactionForm
+                            wallets={wallets}
+                            categories={categories}
                             transaction={tx}
                             onSuccess={() => handleFormSuccess(tx.id)}
                           />

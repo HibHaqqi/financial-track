@@ -19,12 +19,12 @@ export default function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
         <Logo />
-        <div className="flex flex-1 items-center justify-end space-x-4">
+        <div className="flex flex-1 items-center justify-end space-x-2 sm:space-x-4">
           <nav className="flex items-center space-x-2">
-             <Button asChild>
+             <Button asChild size="default" className="gap-2">
                 <Link href="/add-transaction">
-                    <CirclePlus className="mr-2 h-5 w-5" />
-                     Add Transaction
+                    <CirclePlus className="h-5 w-5" />
+                    <span className="hidden sm:inline">Add Transaction</span>
                 </Link>
              </Button>
             <DropdownMenu>

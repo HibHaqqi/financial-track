@@ -9,6 +9,9 @@ import RecentTransactions from './recent-transactions';
 import ExportImport from './export-import';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { Filter } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface DashboardClientProps {
   transactions: Transaction[];
@@ -21,9 +24,11 @@ export default function DashboardClient({
   wallets,
   categories,
 }: DashboardClientProps) {
+  const isMobile = useIsMobile();
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [selectedWalletId, setSelectedWalletId] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
@@ -77,13 +82,30 @@ export default function DashboardClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
           {selectedWalletId === 'all' ? 'Overall Dashboard' : `${wallets.find(w => w.id === selectedWalletId)?.name} Dashboard`}
         </h1>
-        <div className="flex flex-wrap items-center gap-2">
-           <Select value={selectedWalletId} onValueChange={setSelectedWalletId}>
-            <SelectTrigger className="w-[180px]">
+
+        {/* Mobile filter toggle button */}
+        {isMobile && (
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => setShowFilters(!showFilters)}
+            className="w-full sm:w-auto"
+          >
+            <Filter className="mr-2 h-4 w-4" />
+            Filters {showFilters ? '▲' : '▼'}
+          </Button>
+        )}
+      </div>
+
+      {/* Filters section - collapsible on mobile */}
+      <div className={`${isMobile && !showFilters ? 'hidden' : 'block'}`}>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <Select value={selectedWalletId} onValueChange={setSelectedWalletId}>
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Select wallet" />
             </SelectTrigger>
             <SelectContent>
@@ -94,7 +116,7 @@ export default function DashboardClient({
             </SelectContent>
           </Select>
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Select month" />
             </SelectTrigger>
             <SelectContent>
@@ -104,7 +126,7 @@ export default function DashboardClient({
             </SelectContent>
           </Select>
           <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="w-[120px]">
+            <SelectTrigger className="w-full sm:w-[120px]">
               <SelectValue placeholder="Select year" />
             </SelectTrigger>
             <SelectContent>

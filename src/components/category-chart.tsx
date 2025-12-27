@@ -2,6 +2,7 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Transaction, Category } from '@/lib/types';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface CategoryChartProps {
   transactions: Transaction[];
@@ -17,6 +18,8 @@ const COLORS = [
 ];
 
 export default function CategoryChart({ transactions, categories }: CategoryChartProps) {
+  const isMobile = useIsMobile();
+
   const expenseTransactions = transactions.filter((t) => t.type === 'expense');
 
   const data = categories
@@ -32,6 +35,9 @@ export default function CategoryChart({ transactions, categories }: CategoryChar
     })
     .filter((item) => item.value > 0);
 
+  const chartHeight = isMobile ? 250 : 400;
+  const outerRadius = isMobile ? 80 : 120;
+
   return (
     <Card className="h-full">
       <CardHeader>
@@ -39,18 +45,19 @@ export default function CategoryChart({ transactions, categories }: CategoryChar
       </CardHeader>
       <CardContent>
         {data.length > 0 ? (
-          <ResponsiveContainer width="100%" height={400}>
+          <ResponsiveContainer width="100%" height={chartHeight}>
             <PieChart>
               <Pie
                 data={data}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                outerRadius={120}
+                outerRadius={outerRadius}
                 fill="#8884d8"
                 dataKey="value"
                 nameKey="name"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={isMobile ? false : ({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                fontSize={isMobile ? 10 : 12}
               >
                 {data.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -61,11 +68,16 @@ export default function CategoryChart({ transactions, categories }: CategoryChar
                   new Intl.NumberFormat('id-ID').format(value as number)
                 }
               />
-              <Legend />
+              <Legend
+                verticalAlign={isMobile ? "bottom" : "top"}
+                align="center"
+                fontSize={isMobile ? 10 : 12}
+                wrapperStyle={isMobile ? { fontSize: '10px' } : {}}
+              />
             </PieChart>
           </ResponsiveContainer>
         ) : (
-          <div className="flex h-[400px] items-center justify-center text-muted-foreground">
+          <div className="flex h-[200px] sm:h-[400px] items-center justify-center text-muted-foreground">
             No expense data for this period.
           </div>
         )}

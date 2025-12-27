@@ -68,6 +68,9 @@ export default function TransactionForm({ wallets, categories, transaction, onSu
 
   const isEditMode = !!transaction;
 
+  // Mobile: horizontal radio buttons, Desktop: vertical
+  const radioGroupClass = "flex sm:flex-col flex-row sm:space-y-1 sm:space-x-0 space-x-4 space-y-0";
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: isEditMode ? {
@@ -170,7 +173,7 @@ export default function TransactionForm({ wallets, categories, transaction, onSu
                 <RadioGroup
                   onValueChange={field.onChange}
                   defaultValue={field.value}
-                  className="flex flex-col space-y-1"
+                  className={radioGroupClass}
                 >
                   <FormItem className="flex items-center space-x-3 space-y-0">
                     <FormControl>
@@ -257,8 +260,8 @@ export default function TransactionForm({ wallets, categories, transaction, onSu
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Category</FormLabel>
-                <div className="flex items-center gap-2">
-                  <Select onValueChange={field.onChange} value={field.value}>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  <Select onValueChange={field.onChange} value={field.value} className="flex-1 w-full">
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a category" />
@@ -272,12 +275,12 @@ export default function TransactionForm({ wallets, categories, transaction, onSu
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button type="button" variant="outline" size="icon" onClick={handleSuggestion} disabled={isSuggestionLoading}>
+                  <Button type="button" variant="outline" size="icon" onClick={handleSuggestion} disabled={isSuggestionLoading} className="w-10 h-10 flex-shrink-0">
                     {isSuggestionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
                     <span className="sr-only">Suggest Category</span>
                   </Button>
                 </div>
-                <FormDescription>Can't decide? Type a description and click the magic wand!</FormDescription>
+                <FormDescription className="text-xs sm:text-sm">Can't decide? Type a description and click the magic wand!</FormDescription>
                 <FormMessage />
               </FormItem>
             )}

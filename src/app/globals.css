@@ -70,3 +70,10 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Support for safe area insets on mobile devices */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .pb-safe {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+}
