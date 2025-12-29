@@ -154,14 +154,17 @@ export async function DELETE(request: NextRequest) {
     );
   } catch (error: any) {
     console.error('Error deleting credit card:', error);
-    if (error.message === 'Cannot delete credit card with active installments') {
+
+    // Handle specific error messages with better formatting
+    if (error.message && error.message.includes('Cannot delete credit card')) {
       return NextResponse.json(
         { error: error.message },
         { status: 400 }
       );
     }
+
     return NextResponse.json(
-      { error: 'Failed to delete credit card' },
+      { error: error?.message || 'Failed to delete credit card' },
       { status: 500 }
     );
   }

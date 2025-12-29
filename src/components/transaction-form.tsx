@@ -38,13 +38,28 @@ const formSchema = z.object({
   type: z.enum(['income', 'expense', 'transfer'], { required_error: 'Please select a transaction type.' }),
   description: z.string().min(2, { message: 'Description must be at least 2 characters.' }),
   amount: z.coerce.number().positive({ message: 'Please enter a positive amount.' }),
-  walletId: z.string({ required_error: 'Please select a source wallet.' }),
+  fundSource: z.enum(['wallet', 'credit-card'], { required_error: 'Please select a fund source.' }),
+  walletId: z.string().optional(),
+  creditCardId: z.string().optional(),
   destinationWalletId: z.string().optional(),
   categoryId: z.string({ required_error: 'Please select a category.' }),
   date: z.date({ required_error: 'Please select a date.' }),
   isInstallment: z.boolean().optional(),
-  creditCardId: z.string().optional(),
   installmentTenor: z.coerce.number().optional(),
+  linkedWalletId: z.string().optional(),
+}).refine(data => {
+  // If fundSource is wallet, walletId is required
+  if (data.fundSource === 'wallet') {
+    return !!data.walletId;
+  }
+  // If fundSource is credit-card, creditCardId is required
+  if (data.fundSource === 'credit-card') {
+    return !!data.creditCardId;
+  }
+  return true;
+}, {
+  message: "Please select the appropriate fund source",
+  path: ["fundSource"]
 }).refine(data => {
   // If type is transfer, destinationWalletId is required and must be different from walletId
   if (data.type === 'transfer') {
@@ -55,14 +70,14 @@ const formSchema = z.object({
   message: "For transfers, you must select different source and destination wallets",
   path: ["destinationWalletId"]
 }).refine(data => {
-  // If isInstallment is true, creditCardId and tenor must be provided
+  // If isInstallment is true, creditCardId, tenor, and linkedWalletId must be provided
   if (data.isInstallment) {
-    return !!data.creditCardId && !!data.installmentTenor && data.installmentTenor > 0;
+    return !!data.creditCardId && !!data.installmentTenor && data.installmentTenor > 0 && !!data.linkedWalletId;
   }
   return true;
 }, {
-  message: "For installments, please select a credit card and specify tenor",
-  path: ["creditCardId"]
+  message: "For installments, please select a credit card, specify tenor, and choose a wallet for monthly payments",
+  path: ["linkedWalletId"]
 });
 
 interface CreditCard {
@@ -101,13 +116,15 @@ export default function TransactionForm({ wallets, categories, creditCards = [],
       type: 'expense',
       description: '',
       amount: 0,
+      fundSource: 'wallet',
       walletId: '',
+      creditCardId: '',
       destinationWalletId: '',
       categoryId: '',
       date: new Date(),
       isInstallment: false,
-      creditCardId: '',
       installmentTenor: 0,
+      linkedWalletId: '',
     },
   });
 
@@ -159,7 +176,7 @@ export default function TransactionForm({ wallets, categories, creditCards = [],
       let result;
 
       // Handle installment transactions
-      if (!isEditMode && values.isInstallment && values.creditCardId && values.installmentTenor) {
+      if (!isEditMode && values.isInstallment && values.creditCardId && values.installmentTenor && values.linkedWalletId) {
         // Calculate monthly payment
         const monthlyPayment = Math.round(values.amount / values.installmentTenor);
 
@@ -172,6 +189,7 @@ export default function TransactionForm({ wallets, categories, creditCards = [],
             startDate: values.date,
             creditCardId: values.creditCardId,
             categoryId: values.categoryId,
+            linkedWalletId: values.linkedWalletId,
           },
           {
             description: values.description + (values.installmentTenor ? ` (${values.installmentTenor} months)` : ''),
@@ -282,14 +300,46 @@ export default function TransactionForm({ wallets, categories, creditCards = [],
           )}
         />
 
+        {/* Fund Source Selection - Only for expenses */}
+        {form.watch('type') === 'expense' && (
+          <FormField
+            control={form.control}
+            name="fundSource"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Fund Source</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select fund source" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="wallet">💵 Bank Wallet / Cash</SelectItem>
+                    <SelectItem value="credit-card">💳 Credit Card</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormDescription>
+                  Where is this money coming from?
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Wallet field - Always shown (required for record-keeping) */}
           <FormField
             control={form.control}
             name="walletId"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{form.getValues('type') === 'transfer' ? 'Source Wallet' : 'Wallet'}</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormLabel>
+                  {form.getValues('type') === 'transfer' ? 'Source Wallet' :
+                   form.getValues('fundSource') === 'credit-card' ? 'Wallet for Record' : 'Wallet'}
+                </FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || undefined}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a wallet" />
@@ -303,15 +353,52 @@ export default function TransactionForm({ wallets, categories, creditCards = [],
                     ))}
                   </SelectContent>
                 </Select>
+                {form.watch('fundSource') === 'credit-card' && (
+                  <FormDescription>
+                    Required for record-keeping (transaction won't affect this wallet balance)
+                  </FormDescription>
+                )}
                 <FormMessage />
               </FormItem>
             )}
           />
 
-          <FormField
-            control={form.control}
-            name="categoryId"
-            render={({ field }) => (
+          {/* Credit Card Selection - Show when fundSource is credit-card */}
+          {form.watch('fundSource') === 'credit-card' && form.watch('type') === 'expense' && (
+            <FormField
+              control={form.control}
+              name="creditCardId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Credit Card</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select credit card" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {creditCards.map((card) => (
+                        <SelectItem key={card.id} value={card.id}>
+                          {card.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    This will increase your credit card used limit
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+        </div>
+
+        <FormField
+          control={form.control}
+          name="categoryId"
+          render={({ field }) => (
               <FormItem>
                 <FormLabel>Category</FormLabel>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
@@ -341,7 +428,6 @@ export default function TransactionForm({ wallets, categories, creditCards = [],
               </FormItem>
             )}
           />
-        </div>
 
         {form.watch('type') === 'transfer' && (
           <FormField
@@ -408,7 +494,7 @@ export default function TransactionForm({ wallets, categories, creditCards = [],
             />
 
             {form.watch('isInstallment') && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
                   name="creditCardId"
@@ -457,6 +543,34 @@ export default function TransactionForm({ wallets, categories, creditCards = [],
                             minimumFractionDigits: 0
                           }).format(form.watch('amount') / field.value)}`
                         }
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="linkedWalletId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Payment Source Wallet</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select wallet for autopay" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {wallets.map((wallet) => (
+                            <SelectItem key={wallet.id} value={wallet.id}>
+                              {wallet.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription className="text-xs">
+                        Wallet for monthly autopay
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

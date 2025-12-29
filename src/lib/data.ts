@@ -4,7 +4,10 @@ import type { Transaction, Wallet, Category } from './types';
 export const getTransactions = async (userId: string): Promise<Transaction[]> => {
   const transactions = await prisma.transaction.findMany({
     where: { wallet: { userId } },
-    include: { category: true },
+    include: {
+      category: true,
+      creditCard: true
+    },
   });
   return transactions;
 };
@@ -12,6 +15,17 @@ export const getTransactions = async (userId: string): Promise<Transaction[]> =>
 export const getWallets = async (userId: string): Promise<Wallet[]> => {
   const wallets = await prisma.wallet.findMany({
     where: { userId },
+    include: {
+      transactions: {
+        include: {
+          category: true,
+          creditCard: true
+        },
+        orderBy: {
+          date: 'desc'
+        }
+      }
+    }
   });
   return wallets;
 };
@@ -59,64 +73,152 @@ export const deleteCategory = async (id: string): Promise<boolean> => {
   return true;
 };
 
-export const addTransaction = async (transaction: Omit<Transaction, 'id' | 'category' | 'createdAt' | 'updatedAt'>): Promise<Transaction> => {
-  // Handle transfer transactions
-  if (transaction.type === 'transfer' && transaction.destinationWalletId) {
-    // For transfers, we'll create two transactions:
-    // 1. An expense in the source wallet
-    const sourceTransaction = await prisma.transaction.create({
-      data: {
-        amount: transaction.amount,
-        description: `Transfer to another wallet: ${transaction.description}`,
-        type: 'expense', // Use expense for the source wallet
-        date: transaction.date,
-        walletId: transaction.walletId,
-        categoryId: transaction.categoryId,
-      },
-      include: { category: true },
-    });
-
-    // 2. An income in the destination wallet
-    await prisma.transaction.create({
-      data: {
-        amount: transaction.amount,
-        description: `Transfer from another wallet: ${transaction.description}`,
-        type: 'income', // Use income for the destination wallet
-        date: transaction.date,
-        walletId: transaction.destinationWalletId,
-        categoryId: transaction.categoryId,
-      },
-      include: { category: true },
-    });
-
-    // Return the source transaction
-    return sourceTransaction as Transaction;
-  }
-
-  // Handle regular transactions (income/expense)
-  const newTransaction = await prisma.transaction.create({
-    data: {
-      ...transaction,
+export const addTransaction = async (transaction: any): Promise<Transaction> => {
+  try {
+    console.log('🔵 Creating transaction:', {
       type: transaction.type,
-    },
-    include: { category: true },
-  });
+      description: transaction.description.substring(0, 50),
+      amount: transaction.amount,
+      fundSource: transaction.fundSource,
+      creditCardId: transaction.creditCardId,
+      walletId: transaction.walletId,
+    });
 
-  // Auto-detect credit card payments and update credit card limits
-  await processCreditCardPayment(newTransaction);
+    // Extract fundSource and creditCardId before creating transaction (they're not in DB schema)
+    const { fundSource, creditCardId, isInstallment, installmentTenor, linkedWalletId, ...transactionData } = transaction;
 
-  // Auto-detect credit card purchases and update credit card limits
-  await processCreditCardPurchase(newTransaction);
+    // Validate walletId is provided
+    if (!transactionData.walletId) {
+      throw new Error('Wallet is required for transaction record');
+    }
 
-  return newTransaction as Transaction;
+    // Handle transfer transactions
+    if (transaction.type === 'transfer' && transaction.destinationWalletId) {
+      // For transfers, we'll create two transactions:
+      // 1. An expense in the source wallet
+      const sourceTransaction = await prisma.transaction.create({
+        data: {
+          amount: transaction.amount,
+          description: `Transfer to another wallet: ${transaction.description}`,
+          type: 'expense', // Use expense for the source wallet
+          date: transaction.date,
+          walletId: transaction.walletId,
+          categoryId: transaction.categoryId,
+        },
+        include: { category: true },
+      });
+
+      // 2. An income in the destination wallet
+      await prisma.transaction.create({
+        data: {
+          amount: transaction.amount,
+          description: `Transfer from another wallet: ${transaction.description}`,
+          type: 'income', // Use income for the destination wallet
+          date: transaction.date,
+          walletId: transaction.destinationWalletId,
+          categoryId: transaction.categoryId,
+        },
+        include: { category: true },
+      });
+
+      // Return the source transaction
+      return sourceTransaction as Transaction;
+    }
+
+    // Handle regular transactions (income/expense)
+    // Use atomic transaction for credit card operations
+    const result = await prisma.$transaction(async (tx) => {
+      console.log('  → Creating transaction record...');
+
+      // Prepare transaction data with creditCardId if using credit card
+      const createData: any = {
+        ...transactionData,
+        type: transaction.type,
+      };
+
+      // If credit card is selected as fund source, store the creditCardId
+      if (fundSource === 'credit-card' && creditCardId) {
+        createData.creditCardId = creditCardId;
+      }
+
+      const newTransaction = await tx.transaction.create({
+        data: createData,
+        include: { category: true, creditCard: true },
+      });
+
+      console.log('  ✅ Transaction record created:', newTransaction.id);
+      if (newTransaction.creditCardId) {
+        console.log(`     Associated with credit card: ${newTransaction.creditCardId}`);
+      }
+
+      // Check if user selected Credit Card as fund source
+      if (fundSource === 'credit-card' && creditCardId) {
+        // This is a direct credit card purchase (explicitly selected)
+        console.log('  → Processing credit card purchase...');
+        await processCreditCardPurchaseBySelectionTx(tx, creditCardId, transaction.amount);
+        console.log(`💳 Credit card purchase (fund source): ${transaction.amount}`);
+      } else {
+        // Check if this is a credit card payment first (pattern matching)
+        const isPayment = await processCreditCardPaymentTx(tx, newTransaction);
+
+        // If not a payment, check if it's a credit card purchase (pattern matching)
+        if (!isPayment) {
+          await processCreditCardPurchaseTx(tx, newTransaction);
+        }
+      }
+
+      return newTransaction;
+    });
+
+    console.log('✅ Transaction creation complete');
+    return result as Transaction;
+  } catch (error) {
+    console.error('❌ Error in addTransaction:', error);
+    throw error;
+  }
 };
 
-// Helper function to detect and process credit card payments
-const processCreditCardPayment = async (transaction: any) => {
+// Helper function to process credit card purchase when explicitly selected as fund source
+const processCreditCardPurchaseBySelectionTx = async (tx: any, creditCardId: string, amount: number) => {
+  // Get the credit card
+  const creditCard = await tx.creditCard.findUnique({
+    where: { id: creditCardId }
+  });
+
+  if (!creditCard) {
+    throw new Error('Credit card not found');
+  }
+
+  // VALIDATION: Check if purchase would exceed limit
+  const availableLimit = creditCard.totalLimit - creditCard.usedLimit;
+  if (amount > availableLimit) {
+    throw new Error(
+      `Purchase declined: Amount (Rp${amount.toLocaleString()}) exceeds available credit limit (Rp${availableLimit.toLocaleString()}) for card "${creditCard.name}"`
+    );
+  }
+
+  // Increase the used limit (purchase adds debt)
+  await tx.creditCard.update({
+    where: { id: creditCardId },
+    data: {
+      usedLimit: {
+        increment: amount,
+      },
+    },
+  });
+
+  console.log(`💳 Credit card purchase (explicit): ${creditCard.name}`);
+  console.log(`   Amount: Rp${amount.toLocaleString()}`);
+  console.log(`   Available limit before: Rp${availableLimit.toLocaleString()}`);
+  console.log(`   Available limit after: Rp${(availableLimit - amount).toLocaleString()}`);
+};
+
+// Helper function to detect and process credit card payments (with transaction context)
+const processCreditCardPaymentTx = async (tx: any, transaction: any): Promise<boolean> => {
   const { description, amount, type } = transaction;
 
   // Only process expenses that look like credit card payments
-  if (type !== 'expense') return;
+  if (type !== 'expense') return false;
 
   // Pattern 1: "Credit Card Payment - BCA Platinum"
   // Pattern 2: "Payment - BCA Platinum Credit Card"
@@ -134,7 +236,7 @@ const processCreditCardPayment = async (transaction: any) => {
       const cardName = match[1].trim();
 
       // Find the credit card by name
-      const creditCard = await prisma.creditCard.findFirst({
+      const creditCard = await tx.creditCard.findFirst({
         where: {
           name: {
             contains: cardName,
@@ -145,7 +247,7 @@ const processCreditCardPayment = async (transaction: any) => {
 
       if (creditCard) {
         // Decrease the used limit (payment reduces debt)
-        await prisma.creditCard.update({
+        await tx.creditCard.update({
           where: { id: creditCard.id },
           data: {
             usedLimit: {
@@ -155,23 +257,25 @@ const processCreditCardPayment = async (transaction: any) => {
         });
 
         // Also try to update active installments for this card
-        await updateInstallmentsAfterPayment(creditCard.id, amount);
+        await updateInstallmentsAfterPaymentTx(tx, creditCard.id, amount);
 
         console.log(`💳 Credit card payment detected: ${cardName}, Amount: ${amount}`);
-        return; // Process only one match
+        return true; // Payment detected and processed
       }
     }
   }
+
+  return false; // No payment pattern matched
 };
 
-// Helper function to update installments after payment
-const updateInstallmentsAfterPayment = async (creditCardId: string, paymentAmount: number) => {
+// Helper function to update installments after payment (with transaction context)
+const updateInstallmentsAfterPaymentTx = async (tx: any, creditCardId: string, paymentAmount: number) => {
   // Get active installments for this card
-  const activeInstallments = await prisma.installment.findMany({
+  const activeInstallments = await tx.installment.findMany({
     where: {
       creditCardId,
       currentInstallment: {
-        lt: prisma.installment.fields.tenor, // Only active installments
+        lt: tx.installment.fields.tenor, // Only active installments
       },
     },
     include: {
@@ -192,7 +296,7 @@ const updateInstallmentsAfterPayment = async (creditCardId: string, paymentAmoun
   // Check if payment matches the monthly installment amount
   if (Math.abs(paymentAmount - installment.monthlyPayment) < 100) {
     // Payment matches! Increment progress
-    await prisma.installment.update({
+    await tx.installment.update({
       where: { id: installment.id },
       data: {
         currentInstallment: {
@@ -205,8 +309,8 @@ const updateInstallmentsAfterPayment = async (creditCardId: string, paymentAmoun
   }
 };
 
-// Helper function to detect and process credit card purchases
-const processCreditCardPurchase = async (transaction: any) => {
+// Helper function to detect and process credit card purchases (with transaction context)
+const processCreditCardPurchaseTx = async (tx: any, transaction: any) => {
   const { description, amount, type } = transaction;
 
   // Only process expenses that look like credit card purchases
@@ -231,7 +335,7 @@ const processCreditCardPurchase = async (transaction: any) => {
       const cardName = match[1].trim();
 
       // Try to find credit card
-      const creditCard = await prisma.creditCard.findFirst({
+      const creditCard = await tx.creditCard.findFirst({
         where: {
           name: {
             contains: cardName,
@@ -241,8 +345,16 @@ const processCreditCardPurchase = async (transaction: any) => {
       });
 
       if (creditCard) {
+        // VALIDATION: Check if purchase would exceed limit
+        const availableLimit = creditCard.totalLimit - creditCard.usedLimit;
+        if (amount > availableLimit) {
+          throw new Error(
+            `Purchase declined: Amount (Rp${amount.toLocaleString()}) exceeds available credit limit (Rp${availableLimit.toLocaleString()}) for card "${creditCard.name}"`
+          );
+        }
+
         // Increase the used limit (purchase adds debt)
-        await prisma.creditCard.update({
+        await tx.creditCard.update({
           where: { id: creditCard.id },
           data: {
             usedLimit: {
@@ -252,6 +364,8 @@ const processCreditCardPurchase = async (transaction: any) => {
         });
 
         console.log(`💳 Credit card purchase detected: ${cardName}, Amount: ${amount}`);
+        console.log(`   Available limit before: Rp${availableLimit.toLocaleString()}`);
+        console.log(`   Available limit after: Rp${(availableLimit - amount).toLocaleString()}`);
         return; // Process only one match
       }
     }
@@ -271,7 +385,52 @@ export const updateTransaction = async (updatedTransaction: Omit<Transaction, 'c
 };
 
 export const deleteTransaction = async (id: string): Promise<boolean> => {
-  await prisma.transaction.delete({ where: { id } });
+  // Get transaction details with credit card info
+  const transaction = await prisma.transaction.findUnique({
+    where: { id },
+    include: {
+      creditCard: true
+    }
+  });
+
+  if (!transaction) {
+    throw new Error('Transaction not found');
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // If this transaction is linked to an installment, delete the installment too
+    if (transaction.installmentId) {
+      console.log(`🗑️ Deleting transaction linked to installment: ${transaction.description}`);
+      await deleteInstallment(transaction.installmentId);
+    } else if (transaction.creditCardId && transaction.type === 'expense') {
+      // If this transaction was made with a credit card, restore the credit limit
+      const creditCard = await tx.creditCard.findUnique({
+        where: { id: transaction.creditCardId }
+      });
+
+      if (creditCard) {
+        console.log(`💳 Restoring credit limit for deleted transaction:`);
+        console.log(`   Credit Card: ${creditCard.name}`);
+        console.log(`   Amount to restore: Rp${transaction.amount.toLocaleString()}`);
+        console.log(`   Used limit before: Rp${creditCard.usedLimit.toLocaleString()}`);
+
+        await tx.creditCard.update({
+          where: { id: transaction.creditCardId },
+          data: {
+            usedLimit: {
+              decrement: transaction.amount
+            }
+          }
+        });
+
+        console.log(`   Used limit after: Rp${Math.max(0, creditCard.usedLimit - transaction.amount).toLocaleString()}`);
+      }
+    }
+
+    // Delete the transaction
+    await tx.transaction.delete({ where: { id } });
+  });
+
   return true;
 };
 
@@ -352,19 +511,35 @@ export const updateCreditCard = async (id: string, userId: string, updates: {
 };
 
 export const deleteCreditCard = async (id: string, userId: string): Promise<boolean> => {
-  // Check if credit card has active installments
-  const activeInstallments = await prisma.installment.findMany({
-    where: {
-      creditCardId: id,
-      currentInstallment: { lt: prisma.installment.fields.tenor }
-    }
+  console.log(`🔍 Attempting to delete credit card: ${id}`);
+
+  // Check if credit card has ANY installments (active or completed)
+  const allInstallments = await prisma.installment.findMany({
+    where: { creditCardId: id },
+    include: { creditCard: true }
   });
 
-  if (activeInstallments.length > 0) {
-    throw new Error('Cannot delete credit card with active installments');
+  console.log(`📊 Found ${allInstallments.length} installment(s) for this credit card`);
+
+  if (allInstallments.length > 0) {
+    const activeCount = allInstallments.filter(i => i.currentInstallment < i.tenor).length;
+    const completedCount = allInstallments.filter(i => i.currentInstallment >= i.tenor).length;
+
+    console.log(`   • Active: ${activeCount}`);
+    console.log(`   • Completed: ${completedCount}`);
+
+    throw new Error(
+      `Cannot delete credit card with ${allInstallments.length} installment(s).\n` +
+      `• Active: ${activeCount}\n` +
+      `• Completed: ${completedCount}\n\n` +
+      `Please delete all installments first before deleting the credit card.`
+    );
   }
 
   await prisma.creditCard.delete({ where: { id, userId } });
+
+  console.log(`🗑️ Credit card deleted successfully: ${id}`);
+
   return true;
 };
 
@@ -431,21 +606,10 @@ export const addInstallment = async (installment: {
   startDate: Date;
   creditCardId: string;
   categoryId: string;
-  transactionId?: string;
+  linkedWalletId: string;
 }) => {
-  const { transactionId, ...installmentData } = installment;
-
   const newInstallment = await prisma.installment.create({
-    data: {
-      ...installmentData,
-      ...(transactionId && {
-        transaction: {
-          connect: {
-            id: transactionId,
-          },
-        },
-      }),
-    },
+    data: installment,
   });
   return newInstallment;
 };
@@ -462,7 +626,56 @@ export const updateInstallmentProgress = async (id: string): Promise<void> => {
 };
 
 export const deleteInstallment = async (id: string): Promise<boolean> => {
-  await prisma.installment.delete({ where: { id } });
+  // Get installment details before deleting
+  const installment = await prisma.installment.findUnique({
+    where: { id },
+    include: { creditCard: true }
+  });
+
+  if (!installment) {
+    throw new Error('Installment not found');
+  }
+
+  // Count how many monthly payment transactions were actually created by the worker
+  const paymentTransactions = await prisma.transaction.count({
+    where: {
+      installmentId: id,
+      description: { contains: 'Installment payment:' }
+    }
+  });
+
+  // Restore credit card used limit (reverse the initial block + any payments made)
+  // Initial block: totalAmount (when installment was created)
+  // Each monthly payment: -monthlyPayment (reduces used limit)
+  // So we need to restore: totalAmount - (monthlyPayment × paymentsMade)
+  const amountToRestore = installment.totalAmount - (installment.monthlyPayment * paymentTransactions);
+
+  await prisma.$transaction(async (tx) => {
+    // Delete all transactions linked to this installment
+    await tx.transaction.deleteMany({
+      where: { installmentId: id }
+    });
+
+    // Restore credit card limit
+    await tx.creditCard.update({
+      where: { id: installment.creditCardId },
+      data: {
+        usedLimit: {
+          decrement: amountToRestore
+        }
+      }
+    });
+
+    // Delete the installment
+    await tx.installment.delete({ where: { id } });
+  });
+
+  console.log(`🗑️ Installment deleted: ${installment.description}`);
+  console.log(`   Total: Rp${installment.totalAmount.toLocaleString()}`);
+  console.log(`   Monthly payments made: ${paymentTransactions}`);
+  console.log(`   Restored credit card limit: Rp${amountToRestore.toLocaleString()}`);
+  console.log(`   Deleted ${paymentTransactions} related transactions`);
+
   return true;
 };
 

@@ -3,8 +3,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, CreditCard, TrendingDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar, CreditCard, TrendingDown, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 interface InstallmentData {
     id: string;
@@ -30,9 +33,48 @@ interface InstallmentListProps {
     installments: InstallmentData[];
     creditCards: CreditCardData[];
     onRefresh?: () => void;
+    userId?: string;
 }
 
-export function InstallmentList({ installments, creditCards }: InstallmentListProps) {
+export function InstallmentList({ installments, creditCards, onRefresh, userId }: InstallmentListProps) {
+    const { toast } = useToast();
+    const router = useRouter();
+
+    const handleDeleteInstallment = async (installmentId: string, description: string) => {
+        if (!confirm(`Are you sure you want to delete "${description}"?\n\nThis will:\n• Delete the installment\n• Delete all related monthly transactions\n• Restore the credit card limit`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/installments/${installmentId}`, {
+                method: 'DELETE',
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to delete installment');
+            }
+
+            toast({
+                title: 'Installment deleted',
+                description: `"${description}" has been deleted and credit card limit has been restored.`,
+            });
+
+            // Refresh the data
+            if (onRefresh) {
+                onRefresh();
+            } else {
+                router.refresh();
+            }
+        } catch (error) {
+            console.error('Error deleting installment:', error);
+            toast({
+                title: 'Error',
+                description: error instanceof Error ? error.message : 'Failed to delete installment',
+                variant: 'destructive',
+            });
+        }
+    };
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
@@ -95,9 +137,19 @@ export function InstallmentList({ installments, creditCards }: InstallmentListPr
                                                 </span>
                                             </div>
                                         </div>
-                                        <Badge variant="secondary">
-                                            {installment.currentInstallment}/{installment.tenor} months
-                                        </Badge>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="secondary">
+                                                {installment.currentInstallment}/{installment.tenor} months
+                                            </Badge>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                onClick={() => handleDeleteInstallment(installment.id, installment.description)}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </div>
 
                                     {/* Progress */}

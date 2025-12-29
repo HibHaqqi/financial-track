@@ -71,9 +71,13 @@ export async function updateTransaction(transaction: Omit<Transaction, 'category
         await dbUpdateTransaction(transaction);
         revalidatePath('/');
         revalidatePath('/wallets');
+        revalidatePath('/credit-cards');
         return { success: true };
     } catch (error) {
         console.error(error);
+        if (error instanceof Error) {
+            return { success: false, error: error.message };
+        }
         return { success: false, error: 'Failed to update transaction.' };
     }
 }
@@ -83,9 +87,13 @@ export async function deleteTransaction(id: string) {
         await dbDeleteTransaction(id);
         revalidatePath('/');
         revalidatePath('/wallets');
+        revalidatePath('/credit-cards');
         return { success: true };
     } catch (error) {
-        console.error(error);
+        console.error('Error deleting transaction:', error);
+        if (error instanceof Error) {
+            return { success: false, error: error.message };
+        }
         return { success: false, error: 'Failed to delete transaction.' };
     }
 }
@@ -242,30 +250,48 @@ export async function addInstallmentWithTransaction(
         startDate: Date;
         creditCardId: string;
         categoryId: string;
+        linkedWalletId: string;
     },
     transaction: Omit<Transaction, 'id' | 'category' | 'createdAt' | 'updatedAt'>
 ) {
     try {
-        // Create transaction first
-        const createdTransaction = await dbAddTransaction(transaction);
-
-        // Create installment linked to transaction
-        await dbAddInstallment({
-            ...installment,
-            transactionId: createdTransaction.id,
+        console.log('🔍 Creating installment with transaction:', {
+            installment: { ...installment, description: installment.description.substring(0, 30) },
+            transaction: { ...transaction, description: transaction.description.substring(0, 30) }
         });
 
-        // Update credit card used limit
+        // Validate categoryId exists before creating transaction
+        const prisma = await import('@/lib/prisma').then(m => m.default);
+        const categoryExists = await prisma.category.findUnique({
+            where: { id: transaction.categoryId }
+        });
+
+        if (!categoryExists) {
+            console.error('❌ Category not found:', transaction.categoryId);
+            return { success: false, error: 'Invalid category selected. Please select a valid category.' };
+        }
+
+        // Create transaction first
+        await dbAddTransaction(transaction);
+
+        // Create installment (no longer linked to specific transaction)
+        await dbAddInstallment(installment);
+
+        // Update credit card used limit by TOTAL amount (blocks entire limit immediately)
         const { updateCreditCardUsedLimit } = await import('@/lib/data');
         await updateCreditCardUsedLimit(installment.creditCardId, installment.totalAmount);
+
+        console.log(`✅ Installment created: ${installment.description}`);
+        console.log(`   Total: Rp${installment.totalAmount.toLocaleString()}, Monthly: Rp${installment.monthlyPayment.toLocaleString()}`);
+        console.log(`   Credit card used limit increased by: Rp${installment.totalAmount.toLocaleString()}`);
 
         revalidatePath('/credit-cards');
         revalidatePath('/');
         revalidatePath('/wallets');
         return { success: true };
     } catch (error) {
-        console.error(error);
-        return { success: false, error: 'Failed to add installment with transaction.' };
+        console.error('❌ Error in addInstallmentWithTransaction:', error);
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to add installment with transaction.' };
     }
 }
 

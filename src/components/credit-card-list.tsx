@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 import CreditCardWidget from './credit-card-widget';
 import { InstallmentList } from './installment-list';
 import { CreditCardForm } from './credit-card-form';
+import { CreditCardTransactions } from './credit-card-transactions';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Button } from '@/components/ui/button';
+import { ChevronDown, CreditCard } from 'lucide-react';
 
 interface CreditCard {
   id: string;
@@ -35,6 +39,7 @@ export default function CreditCardList() {
   const [installments, setInstallments] = useState<Installment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -149,6 +154,41 @@ export default function CreditCardList() {
 
       {/* Installments Section */}
       <InstallmentList installments={installments} creditCards={creditCards} />
+
+      {/* Per-Card Transaction Lists */}
+      {creditCards.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Credit Card Transactions</h3>
+          {creditCards.map((card) => (
+            <Collapsible
+              key={card.id}
+              open={expandedCardId === card.id}
+              onOpenChange={(open) => setExpandedCardId(open ? card.id : null)}
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-between h-auto py-3"
+                >
+                  <span className="flex items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    {card.name}
+                  </span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${
+                    expandedCardId === card.id ? 'transform rotate-180' : ''
+                  }`} />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-4">
+                <CreditCardTransactions
+                  creditCardId={card.id}
+                  creditCardName={card.name}
+                />
+              </CollapsibleContent>
+            </Collapsible>
+          ))}
+        </div>
+      )}
 
       {/* Add/Edit Form Modal */}
       {showForm && (

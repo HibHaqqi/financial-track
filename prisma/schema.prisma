@@ -30,6 +30,7 @@ model Wallet {
   userId       String
   user         User          @relation(fields: [userId], references: [id])
   transactions Transaction[]
+  installments Installment[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 }
@@ -51,8 +52,9 @@ model Transaction {
   destinationWalletId String?
   categoryId          String
   category            Category        @relation(fields: [categoryId], references: [id])
-  installmentId       String?         @unique
-  installment         Installment?    @relation(fields: [installmentId], references: [id])
+  creditCardId        String?
+  creditCard          CreditCard?     @relation(fields: [creditCardId], references: [id])
+  installmentId       String?
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 }
@@ -80,6 +82,7 @@ model CreditCard {
   userId       String
   user         User          @relation(fields: [userId], references: [id])
   installments Installment[]
+  transactions Transaction[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 }
@@ -96,7 +99,8 @@ model Installment {
   creditCard         CreditCard   @relation(fields: [creditCardId], references: [id])
   categoryId         String
   category           Category     @relation(fields: [categoryId], references: [id])
-  transaction        Transaction?
+  linkedWalletId     String?
+  linkedWallet       Wallet?      @relation(fields: [linkedWalletId], references: [id])
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 }
