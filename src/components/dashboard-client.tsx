@@ -18,12 +18,16 @@ interface DashboardClientProps {
   transactions: Transaction[];
   wallets: Wallet[];
   categories: Category[];
+  creditCards?: any[];
+  installments?: any[];
 }
 
 export default function DashboardClient({
   transactions,
   wallets,
   categories,
+  creditCards = [],
+  installments = [],
 }: DashboardClientProps) {
   const isMobile = useIsMobile();
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
@@ -160,8 +164,8 @@ export default function DashboardClient({
       {/* Credit Cards Section */}
       <div className="grid gap-4">
         <CreditCardWidget
-          creditCards={[]}
-          installments={[]}
+          creditCards={creditCards}
+          installments={installments}
           onRefresh={() => { }}
         />
       </div>

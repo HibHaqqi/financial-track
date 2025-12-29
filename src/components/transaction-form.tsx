@@ -32,7 +32,7 @@ import { Calendar as CalendarIcon, Wand2, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import type { Wallet, Category, Transaction } from '@/lib/types';
-import { getCategorySuggestion, addTransaction, updateTransaction } from '@/app/actions';
+import { getCategorySuggestion, addTransaction, updateTransaction, addInstallmentWithTransaction } from '@/app/actions';
 
 const formSchema = z.object({
   type: z.enum(['income', 'expense', 'transfer'], { required_error: 'Please select a transaction type.' }),
@@ -156,9 +156,39 @@ export default function TransactionForm({ wallets, categories, creditCards = [],
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     startSubmittingTransition(async () => {
-      const result = isEditMode
-        ? await updateTransaction({ ...values, id: transaction.id })
-        : await addTransaction(values);
+      let result;
+
+      // Handle installment transactions
+      if (!isEditMode && values.isInstallment && values.creditCardId && values.installmentTenor) {
+        // Calculate monthly payment
+        const monthlyPayment = Math.round(values.amount / values.installmentTenor);
+
+        result = await addInstallmentWithTransaction(
+          {
+            description: values.description,
+            totalAmount: values.amount,
+            monthlyPayment: monthlyPayment,
+            tenor: values.installmentTenor,
+            startDate: values.date,
+            creditCardId: values.creditCardId,
+            categoryId: values.categoryId,
+          },
+          {
+            description: values.description + (values.installmentTenor ? ` (${values.installmentTenor} months)` : ''),
+            amount: values.amount,
+            type: values.type,
+            date: values.date,
+            walletId: values.walletId,
+            categoryId: values.categoryId,
+            destinationWalletId: values.destinationWalletId,
+          }
+        );
+      } else {
+        // Handle regular transactions
+        result = isEditMode
+          ? await updateTransaction({ ...values, id: transaction.id })
+          : await addTransaction(values);
+      }
 
       if (result.success) {
         let transactionTypeText = 'Expense';

@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import TransactionForm from '@/components/transaction-form';
-import { getWallets, getCategories } from '@/lib/data';
+import { getWallets, getCategories, getCreditCards } from '@/lib/data';
 import Header from '@/components/header';
 import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 import { getServerSession } from 'next-auth';
@@ -18,6 +18,7 @@ export default async function AddTransactionPage() {
   }
   const wallets = await getWallets(session.user.id);
   const categories = await getCategories(session.user.id);
+  const creditCards = await getCreditCards(session.user.id);
 
   return (
     <div className="flex min-h-screen w-full flex-col">
@@ -39,7 +40,7 @@ export default async function AddTransactionPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <TransactionForm wallets={wallets} categories={categories} />
+            <TransactionForm wallets={wallets} categories={categories} creditCards={creditCards} />
           </CardContent>
         </Card>
       </main>
