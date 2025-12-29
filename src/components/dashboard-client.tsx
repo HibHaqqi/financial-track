@@ -7,6 +7,7 @@ import CategoryChart from './category-chart';
 import BalanceChart from './balance-chart';
 import RecentTransactions from './recent-transactions';
 import ExportImport from './export-import';
+import CreditCardWidget from './credit-card-widget';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -42,10 +43,10 @@ export default function DashboardClient({
 
   const allTimeTransactions = useMemo(() => {
     return transactions.filter(tx => {
-        const txDate = new Date(tx.date);
-        const yearMatch = txDate.getFullYear() === parseInt(selectedYear);
-        const walletMatch = selectedWalletId === 'all' || tx.walletId === selectedWalletId;
-        return yearMatch && walletMatch;
+      const txDate = new Date(tx.date);
+      const yearMatch = txDate.getFullYear() === parseInt(selectedYear);
+      const walletMatch = selectedWalletId === 'all' || tx.walletId === selectedWalletId;
+      return yearMatch && walletMatch;
     })
   }, [transactions, selectedYear, selectedWalletId])
 
@@ -67,8 +68,8 @@ export default function DashboardClient({
       return [new Date().getFullYear()];
     }
     const allYears = transactions.map(tx => new Date(tx.date).getFullYear());
-    return [...new Set(allYears)].sort((a,b) => b-a);
-  },[transactions]);
+    return [...new Set(allYears)].sort((a, b) => b - a);
+  }, [transactions]);
 
   const months = [
     { value: 'all', label: 'All Months' },
@@ -150,8 +151,19 @@ export default function DashboardClient({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-          <BalanceChart transactions={allTimeTransactions} />
-          <CategoryChart transactions={filteredTransactions} categories={categories} />
+        <BalanceChart transactions={allTimeTransactions} />
+        <CategoryChart transactions={filteredTransactions} categories={categories} />
+      </div>
+
+      <Separator />
+
+      {/* Credit Cards Section */}
+      <div className="grid gap-4">
+        <CreditCardWidget
+          creditCards={[]}
+          installments={[]}
+          onRefresh={() => { }}
+        />
       </div>
 
       <Separator />
