@@ -248,12 +248,12 @@ const processCreditCardPaymentTx = async (tx: any, transaction: any): Promise<bo
 
       if (creditCard) {
         // Decrease the used limit (payment reduces debt)
+        // IMPORTANT: usedLimit should never go negative (can't pay more than you owe)
+        const newUsedLimit = Math.max(0, creditCard.usedLimit - amount);
         await tx.creditCard.update({
           where: { id: creditCard.id },
           data: {
-            usedLimit: {
-              decrement: amount,
-            },
+            usedLimit: newUsedLimit,
           },
         });
 
@@ -373,7 +373,7 @@ const processCreditCardPurchaseTx = async (tx: any, transaction: any) => {
   }
 };
 
-export const updateTransaction = async (updatedTransaction: Omit<Transaction, 'category' | 'createdAt' | 'updatedAt'>): Promise<Transaction | null> => {
+export const updateTransaction = async (updatedTransaction: Omit<Transaction, 'category' | 'createdAt' | 'updatedAt'> & { fundSource?: string }): Promise<Transaction | null> => {
   // Get the old transaction first
   const oldTransaction = await prisma.transaction.findUnique({
     where: { id: updatedTransaction.id },
@@ -389,23 +389,43 @@ export const updateTransaction = async (updatedTransaction: Omit<Transaction, 'c
     // REVERSE OLD TRANSACTION EFFECTS
     // If old transaction was using a credit card, restore the credit limit
     if (oldTransaction.creditCardId && oldTransaction.type === 'expense') {
+      // Check if old transaction was a PAYMENT or PURCHASE
+      const isOldPayment = /credit\s+card\s+payment|bayar\s+kartu\s+kredit|pembayaran\s+kartu\s+kredit/i.test(oldTransaction.description || '');
+
       const oldCreditCard = await tx.creditCard.findUnique({
         where: { id: oldTransaction.creditCardId }
       });
 
       if (oldCreditCard) {
-        console.log(`💳 Restoring credit limit for edited transaction:`);
-        console.log(`   Credit Card: ${oldCreditCard.name}`);
-        console.log(`   Amount to restore: Rp${oldTransaction.amount.toLocaleString()}`);
+        if (isOldPayment) {
+          // Reversing a PAYMENT: Need to INCREASE usedLimit (undo the payment effect)
+          console.log(`💳 Reversing credit card payment (editing transaction):`);
+          console.log(`   Credit Card: ${oldCreditCard.name}`);
+          console.log(`   Payment amount to reverse: Rp${oldTransaction.amount.toLocaleString()}`);
 
-        await tx.creditCard.update({
-          where: { id: oldTransaction.creditCardId },
-          data: {
-            usedLimit: {
-              decrement: oldTransaction.amount
+          await tx.creditCard.update({
+            where: { id: oldTransaction.creditCardId },
+            data: {
+              usedLimit: {
+                increment: oldTransaction.amount  // Add back the debt
+              }
             }
-          }
-        });
+          });
+        } else {
+          // Reversing a PURCHASE: Need to DECREASE usedLimit (restore the credit limit)
+          console.log(`💳 Restoring credit limit for edited purchase transaction:`);
+          console.log(`   Credit Card: ${oldCreditCard.name}`);
+          console.log(`   Purchase amount to restore: Rp${oldTransaction.amount.toLocaleString()}`);
+
+          await tx.creditCard.update({
+            where: { id: oldTransaction.creditCardId },
+            data: {
+              usedLimit: {
+                decrement: oldTransaction.amount  // Remove the debt
+              }
+            }
+          });
+        }
       }
     }
 
@@ -486,28 +506,69 @@ export const deleteTransaction = async (id: string): Promise<boolean> => {
     if (transaction.installmentId) {
       console.log(`🗑️ Deleting transaction linked to installment: ${transaction.description}`);
       await deleteInstallment(transaction.installmentId);
-    } else if (transaction.creditCardId && transaction.type === 'expense') {
-      // If this transaction was made with a credit card, restore the credit limit
-      const creditCard = await tx.creditCard.findUnique({
-        where: { id: transaction.creditCardId }
-      });
+    } else if (transaction.type === 'expense') {
+      // Check if this is a credit card PAYMENT or PURCHASE
+      const isPayment = /credit\s+card\s+payment\s*[-:]\s*(.+)|bayar\s+kartu\s+kredit\s*[-:]\s*(.+)|pembayaran\s+kartu\s+kredit\s*[-:]\s*(.+)/i.test(transaction.description);
+
+      let creditCard = null;
+
+      // If transaction has a creditCardId, use it
+      if (transaction.creditCardId) {
+        creditCard = await tx.creditCard.findUnique({
+          where: { id: transaction.creditCardId }
+        });
+      } else if (isPayment) {
+        // Payment transactions might not have creditCardId, extract card name from description
+        const match = transaction.description.match(/credit\s+card\s+payment\s*[-:]\s*(.+)|bayar\s+kartu\s+kredit\s*[-:]\s*(.+)|pembayaran\s+kartu\s+kredit\s*[-:]\s*(.+)/i);
+        if (match && match[1]) {
+          const cardName = match[1].trim();
+          creditCard = await tx.creditCard.findFirst({
+            where: {
+              name: {
+                contains: cardName,
+                mode: 'insensitive',
+              },
+            },
+          });
+        }
+      }
 
       if (creditCard) {
-        console.log(`💳 Restoring credit limit for deleted transaction:`);
-        console.log(`   Credit Card: ${creditCard.name}`);
-        console.log(`   Amount to restore: Rp${transaction.amount.toLocaleString()}`);
-        console.log(`   Used limit before: Rp${creditCard.usedLimit.toLocaleString()}`);
+        if (isPayment) {
+          // Deleting a PAYMENT transaction: Need to INCREASE usedLimit (undo the payment, bring back debt)
+          console.log(`💳 Undoing credit card payment (deleted transaction):`);
+          console.log(`   Credit Card: ${creditCard.name}`);
+          console.log(`   Payment amount: Rp${transaction.amount.toLocaleString()}`);
+          console.log(`   Used limit before: Rp${creditCard.usedLimit.toLocaleString()}`);
 
-        await tx.creditCard.update({
-          where: { id: transaction.creditCardId },
-          data: {
-            usedLimit: {
-              decrement: transaction.amount
+          await tx.creditCard.update({
+            where: { id: creditCard.id },
+            data: {
+              usedLimit: {
+                increment: transaction.amount  // Add back the debt
+              }
             }
-          }
-        });
+          });
 
-        console.log(`   Used limit after: Rp${Math.max(0, creditCard.usedLimit - transaction.amount).toLocaleString()}`);
+          console.log(`   Used limit after: Rp${(creditCard.usedLimit + transaction.amount).toLocaleString()}`);
+        } else {
+          // Deleting a PURCHASE transaction: Need to DECREASE usedLimit (restore the credit limit)
+          console.log(`💳 Restoring credit limit for deleted purchase transaction:`);
+          console.log(`   Credit Card: ${creditCard.name}`);
+          console.log(`   Purchase amount: Rp${transaction.amount.toLocaleString()}`);
+          console.log(`   Used limit before: Rp${creditCard.usedLimit.toLocaleString()}`);
+
+          await tx.creditCard.update({
+            where: { id: creditCard.id },
+            data: {
+              usedLimit: {
+                decrement: transaction.amount  // Remove the debt
+              }
+            }
+          });
+
+          console.log(`   Used limit after: Rp${Math.max(0, creditCard.usedLimit - transaction.amount).toLocaleString()}`);
+        }
       }
     }
 
@@ -554,7 +615,27 @@ export const getCreditCards = async (userId: string) => {
     },
     orderBy: { createdAt: 'desc' }
   });
-  return creditCards;
+
+  // Calculate usedLimit for each card from actual transactions (NOT from stored value)
+  const cardsWithCalculatedLimit = await Promise.all(
+    creditCards.map(async (card) => {
+      const transactions = await prisma.transaction.findMany({
+        where: {
+          creditCardId: card.id,
+          type: 'expense',
+        },
+      });
+
+      const usedLimit = transactions.reduce((sum, t) => sum + t.amount, 0);
+
+      return {
+        ...card,
+        usedLimit, // Override with calculated value
+      };
+    })
+  );
+
+  return cardsWithCalculatedLimit;
 };
 
 export const getCreditCardById = async (id: string, userId: string) => {
