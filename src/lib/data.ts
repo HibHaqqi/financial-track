@@ -619,14 +619,48 @@ export const getCreditCards = async (userId: string) => {
   // Calculate usedLimit for each card from actual transactions (NOT from stored value)
   const cardsWithCalculatedLimit = await Promise.all(
     creditCards.map(async (card) => {
-      const transactions = await prisma.transaction.findMany({
+      // Get purchases (transactions with this creditCardId)
+      const purchaseTransactions = await prisma.transaction.findMany({
         where: {
           creditCardId: card.id,
           type: 'expense',
         },
       });
 
-      const usedLimit = transactions.reduce((sum, t) => sum + t.amount, 0);
+      // Get potential payments (expenses without creditCardId)
+      const allExpensesWithoutCard = await prisma.transaction.findMany({
+        where: {
+          creditCardId: null,
+          type: 'expense',
+        },
+      });
+
+      // Filter to find payments for this specific card (by description matching)
+      const paymentPatterns = [
+        new RegExp(`credit\\s+card\\s+payment\\s*[-:]\\s*${card.name}`, 'i'),
+        new RegExp(`bayar\\s+kartu\\s+kredit\\s*[-:]\\s*${card.name}`, 'i'),
+        new RegExp(`pembayaran\\s+kartu\\s+kredit\\s*[-:]\\s*${card.name}`, 'i'),
+      ];
+
+      const paymentTransactions = allExpensesWithoutCard.filter(t =>
+        paymentPatterns.some(pattern => pattern.test(t.description))
+      );
+
+      // Calculate: Purchases ADD to usedLimit, Payments SUBTRACT from usedLimit
+      let usedLimit = 0;
+
+      // Add all purchases
+      for (const t of purchaseTransactions) {
+        usedLimit += t.amount;
+      }
+
+      // Subtract all payments
+      for (const t of paymentTransactions) {
+        usedLimit -= t.amount;
+      }
+
+      // Ensure usedLimit never goes negative
+      usedLimit = Math.max(0, usedLimit);
 
       return {
         ...card,
