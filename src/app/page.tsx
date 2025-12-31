@@ -1,5 +1,5 @@
 import DashboardClient from '@/components/dashboard-client';
-import { getTransactions, getWallets, getCategories } from '@/lib/data';
+import { getTransactions, getWallets, getCategories, getCreditCards, getActiveInstallments } from '@/lib/data';
 import Header from '@/components/header';
 
 import { getServerSession } from 'next-auth';
@@ -15,6 +15,8 @@ export default async function DashboardPage() {
   const transactions = await getTransactions(session.user.id);
   const wallets = await getWallets(session.user.id);
   const categories = await getCategories(session.user.id);
+  const creditCards = await getCreditCards(session.user.id);
+  const installments = await getActiveInstallments(session.user.id);
 
   return (
     <div className="flex min-h-screen w-full flex-col">
@@ -24,6 +26,8 @@ export default async function DashboardPage() {
           transactions={transactions}
           wallets={wallets}
           categories={categories}
+          creditCards={creditCards}
+          installments={installments}
         />
       </main>
     </div>

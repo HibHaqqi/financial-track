@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Plus, Wallet, Tag, User } from 'lucide-react';
+import { Home, Plus, Wallet, Tag, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -36,9 +36,9 @@ export function MobileBottomNav() {
       icon: Tag,
     },
     {
-      href: '/profile',
-      label: 'Profile',
-      icon: User,
+      href: '/credit-cards',
+      label: 'Cards',
+      icon: CreditCard,
     },
   ];
 

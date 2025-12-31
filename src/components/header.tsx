@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { CircleUser, LogOut, CirclePlus, Landmark, Tag } from 'lucide-react';
+import { CircleUser, LogOut, CirclePlus, Landmark, Tag, CreditCard } from 'lucide-react';
 import Logo from './logo';
 import { signOut } from 'next-auth/react';
 
@@ -21,12 +21,12 @@ export default function Header() {
         <Logo />
         <div className="flex flex-1 items-center justify-end space-x-2 sm:space-x-4">
           <nav className="flex items-center space-x-2">
-             <Button asChild size="default" className="gap-2">
-                <Link href="/add-transaction">
-                    <CirclePlus className="h-5 w-5" />
-                    <span className="hidden sm:inline">Add Transaction</span>
-                </Link>
-             </Button>
+            <Button asChild size="default" className="gap-2">
+              <Link href="/add-transaction">
+                <CirclePlus className="h-5 w-5" />
+                <span className="hidden sm:inline">Add Transaction</span>
+              </Link>
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="secondary" size="icon" className="rounded-full">
@@ -40,7 +40,7 @@ export default function Header() {
                 <DropdownMenuItem asChild>
                   <Link href="/profile">Profile</Link>
                 </DropdownMenuItem>
-                 <DropdownMenuItem asChild>
+                <DropdownMenuItem asChild>
                   <Link href="/wallets">
                     <Landmark className="mr-2 h-4 w-4" />
                     <span>Wallets</span>
@@ -50,6 +50,12 @@ export default function Header() {
                   <Link href="/categories">
                     <Tag className="mr-2 h-4 w-4" />
                     <span>Categories</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/credit-cards">
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    <span>Credit Cards</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem>Settings</DropdownMenuItem>

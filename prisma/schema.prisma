@@ -14,13 +14,14 @@ datasource db {
 }
 
 model User {
-  id         String     @id @default(uuid())
-  email      String     @unique
-  password   String
-  wallets    Wallet[]
-  categories Category[]
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  id          String       @id @default(uuid())
+  email       String       @unique
+  password    String
+  wallets     Wallet[]
+  categories  Category[]
+  creditCards CreditCard[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 model Wallet {
@@ -29,6 +30,7 @@ model Wallet {
   userId       String
   user         User          @relation(fields: [userId], references: [id])
   transactions Transaction[]
+  installments Installment[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 }
@@ -40,18 +42,21 @@ enum TransactionType {
 }
 
 model Transaction {
-  id                 String          @id @default(uuid())
-  amount             Float
-  description        String
-  type               TransactionType
-  date               DateTime
-  walletId           String
-  wallet             Wallet          @relation(fields: [walletId], references: [id])
+  id                  String          @id @default(uuid())
+  amount              Float
+  description         String
+  type                TransactionType
+  date                DateTime
+  walletId            String
+  wallet              Wallet          @relation(fields: [walletId], references: [id])
   destinationWalletId String?
-  categoryId         String
-  category           Category        @relation(fields: [categoryId], references: [id])
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  categoryId          String
+  category            Category        @relation(fields: [categoryId], references: [id])
+  creditCardId        String?
+  creditCard          CreditCard?     @relation(fields: [creditCardId], references: [id])
+  installmentId       String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 }
 
 model Category {
@@ -61,8 +66,41 @@ model Category {
   userId       String
   user         User          @relation(fields: [userId], references: [id])
   transactions Transaction[]
+  installments Installment[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
   @@unique([name, userId], name: "name_userId")
+}
+
+model CreditCard {
+  id           String        @id @default(uuid())
+  name         String
+  totalLimit   Float
+  usedLimit    Float         @default(0)
+  billingDate  Int
+  userId       String
+  user         User          @relation(fields: [userId], references: [id])
+  installments Installment[]
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model Installment {
+  id                 String       @id @default(uuid())
+  description        String
+  totalAmount        Float
+  monthlyPayment     Float
+  tenor              Int
+  currentInstallment Int          @default(1)
+  startDate          DateTime
+  creditCardId       String
+  creditCard         CreditCard   @relation(fields: [creditCardId], references: [id])
+  categoryId         String
+  category           Category     @relation(fields: [categoryId], references: [id])
+  linkedWalletId     String?
+  linkedWallet       Wallet?      @relation(fields: [linkedWalletId], references: [id])
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 }
