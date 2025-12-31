@@ -111,7 +111,8 @@ export default function TransactionForm({ wallets, categories, creditCards = [],
     resolver: zodResolver(formSchema),
     defaultValues: isEditMode ? {
       ...transaction,
-      date: new Date(transaction.date)
+      date: new Date(transaction.date),
+      fundSource: transaction.creditCardId ? 'credit-card' : 'wallet',
     } : {
       type: 'expense',
       description: '',
@@ -132,10 +133,21 @@ export default function TransactionForm({ wallets, categories, creditCards = [],
     if (isEditMode) {
       form.reset({
         ...transaction,
-        date: new Date(transaction.date)
+        date: new Date(transaction.date),
+        fundSource: transaction.creditCardId ? 'credit-card' : 'wallet',
       });
     }
   }, [transaction, isEditMode, form]);
+
+  // Auto-select first credit card when fund source changes to credit-card
+  const fundSource = form.watch('fundSource');
+  useEffect(() => {
+    const currentCreditCardId = form.getValues('creditCardId');
+
+    if (fundSource === 'credit-card' && !currentCreditCardId && creditCards.length > 0) {
+      form.setValue('creditCardId', creditCards[0].id);
+    }
+  }, [fundSource]);
 
   const handleSuggestion = async () => {
     const description = form.getValues('description');

@@ -4,8 +4,31 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, CreditCard, TrendingUp, TrendingDown } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar, CreditCard, TrendingUp, TrendingDown, Edit, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import TransactionForm from './transaction-form';
+import { deleteTransaction } from '@/app/actions';
+import { useToast } from '@/hooks/use-toast';
 
 interface Transaction {
   id: string;
@@ -23,11 +46,16 @@ interface Transaction {
 interface CreditCardTransactionsProps {
   creditCardId: string;
   creditCardName: string;
+  wallets: any[];
+  categories: any[];
+  creditCards: any[];
 }
 
-export function CreditCardTransactions({ creditCardId, creditCardName }: CreditCardTransactionsProps) {
+export function CreditCardTransactions({ creditCardId, creditCardName, wallets, categories, creditCards }: CreditCardTransactionsProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState<Record<string, boolean>>({});
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchTransactions();
@@ -113,6 +141,32 @@ export function CreditCardTransactions({ creditCardId, creditCardName }: CreditC
            description.toLowerCase().includes('pembayaran kartu kredit');
   };
 
+  const handleDelete = async (id: string) => {
+    const result = await deleteTransaction(id);
+    if (result.success) {
+      toast({
+        title: 'Success',
+        description: 'Transaction deleted successfully.',
+      });
+      fetchTransactions(); // Refresh the list
+    } else {
+      toast({
+        title: 'Error',
+        description: result.error || 'Failed to delete transaction.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDialogChange = (txId: string, open: boolean) => {
+    setDialogOpen(prev => ({...prev, [txId]: open}));
+  };
+
+  const handleFormSuccess = (txId: string) => {
+    handleDialogChange(txId, false);
+    fetchTransactions(); // Refresh the list
+  };
+
   if (loading) {
     return (
       <Card>
@@ -168,7 +222,7 @@ export function CreditCardTransactions({ creditCardId, creditCardName }: CreditC
                         <span>{transaction.category.name}</span>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
+                    <div className="flex flex-col items-end gap-2">
                       <div className="flex items-center gap-1">
                         {isCreditCardPayment(transaction.description) ? (
                           <TrendingUp className="h-3 w-3 text-green-500" />
@@ -188,6 +242,51 @@ export function CreditCardTransactions({ creditCardId, creditCardName }: CreditC
                       >
                         {isCreditCardPayment(transaction.description) ? 'Payment' : 'Purchase'}
                       </Badge>
+                      <div className="flex gap-1">
+                        <Dialog open={dialogOpen[transaction.id]} onOpenChange={(open) => handleDialogChange(transaction.id, open)}>
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-md max-h-[90vh]">
+                            <DialogHeader>
+                              <DialogTitle>Edit Transaction</DialogTitle>
+                              <DialogDescription>
+                                Update the details of your transaction.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <ScrollArea className="max-h-[calc(90vh-120px)] pr-4">
+                              <TransactionForm
+                                wallets={wallets}
+                                categories={categories}
+                                creditCards={creditCards}
+                                transaction={transaction}
+                                onSuccess={() => handleFormSuccess(transaction.id)}
+                              />
+                            </ScrollArea>
+                          </DialogContent>
+                        </Dialog>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500 hover:text-red-600">
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete this transaction.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(transaction.id)}>Delete</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -11,7 +11,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { Transaction, Category, Wallet } from '@/lib/types';
-import { ArrowDownCircle, ArrowUpCircle, Edit, Trash2 } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, Edit, Trash2, CreditCard, Wallet as WalletIcon } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
 import {
@@ -43,12 +43,14 @@ interface RecentTransactionsProps {
   transactions: Transaction[];
   categories: Category[];
   wallets: Wallet[];
+  creditCards?: any[];
 }
 
 export default function RecentTransactions({
   transactions,
   categories,
   wallets,
+  creditCards = [],
 }: RecentTransactionsProps) {
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -56,6 +58,23 @@ export default function RecentTransactions({
 
   const getCategoryName = (id: string) =>
     categories.find((c) => c.id === id)?.name || 'N/A';
+
+  const getFundSourceBadge = (tx: Transaction) => {
+    if (tx.creditCard) {
+      return (
+        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 gap-1">
+          <CreditCard className="h-2.5 w-2.5" />
+          {tx.creditCard.name}
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1">
+        <WalletIcon className="h-2.5 w-2.5" />
+        {tx.wallet?.name || 'Wallet'}
+      </Badge>
+    );
+  };
 
   const sortedTransactions = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -108,10 +127,11 @@ export default function RecentTransactions({
                           <div className="text-[10px] text-muted-foreground mt-0.5">
                             {new Date(tx.date).toLocaleDateString()}
                           </div>
-                          <div className="mt-1">
+                          <div className="mt-1 flex gap-1 flex-wrap">
                             <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                               {getCategoryName(tx.categoryId)}
                             </Badge>
+                            {getFundSourceBadge(tx)}
                           </div>
                           <div
                             className={`text-sm font-bold mt-1 ${
@@ -130,19 +150,22 @@ export default function RecentTransactions({
                               <Edit className="h-3.5 w-3.5" />
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-md">
+                          <DialogContent className="max-w-md max-h-[90vh]">
                             <DialogHeader>
                               <DialogTitle>Edit Transaction</DialogTitle>
                               <DialogDescription>
                                 Update the details of your transaction.
                               </DialogDescription>
                             </DialogHeader>
-                            <TransactionForm
-                              wallets={wallets}
-                              categories={categories}
-                              transaction={tx}
-                              onSuccess={() => handleFormSuccess(tx.id)}
-                            />
+                            <ScrollArea className="max-h-[calc(90vh-120px)] pr-4">
+                              <TransactionForm
+                                wallets={wallets}
+                                categories={categories}
+                                creditCards={creditCards}
+                                transaction={tx}
+                                onSuccess={() => handleFormSuccess(tx.id)}
+                              />
+                            </ScrollArea>
                           </DialogContent>
                         </Dialog>
                         <AlertDialog>
@@ -193,6 +216,7 @@ export default function RecentTransactions({
               <TableRow>
                 <TableHead>Description</TableHead>
                 <TableHead>Category</TableHead>
+                <TableHead>Fund Source</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -221,6 +245,19 @@ export default function RecentTransactions({
                         {getCategoryName(tx.categoryId)}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      {tx.creditCard ? (
+                        <Badge variant="secondary" className="gap-1">
+                          <CreditCard className="h-3 w-3" />
+                          {tx.creditCard.name}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="gap-1">
+                          <WalletIcon className="h-3 w-3" />
+                          {tx.wallet?.name || 'Wallet'}
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell
                       className={`text-right font-medium ${
                         tx.type === 'income' ? 'text-green-600' : 'text-red-600'
@@ -236,19 +273,22 @@ export default function RecentTransactions({
                               <Edit className="h-4 w-4" />
                             </Button>
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent className="max-h-[90vh]">
                           <DialogHeader>
                             <DialogTitle>Edit Transaction</DialogTitle>
                             <DialogDescription>
                               Update the details of your transaction.
                             </DialogDescription>
                           </DialogHeader>
-                          <TransactionForm
-                            wallets={wallets}
-                            categories={categories}
-                            transaction={tx}
-                            onSuccess={() => handleFormSuccess(tx.id)}
-                          />
+                          <ScrollArea className="max-h-[calc(90vh-120px)] pr-4">
+                            <TransactionForm
+                              wallets={wallets}
+                              categories={categories}
+                              creditCards={creditCards}
+                              transaction={tx}
+                              onSuccess={() => handleFormSuccess(tx.id)}
+                            />
+                          </ScrollArea>
                         </DialogContent>
                       </Dialog>
                       <AlertDialog>
@@ -275,7 +315,7 @@ export default function RecentTransactions({
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">
                     No transactions for this period.
                   </TableCell>
                 </TableRow>

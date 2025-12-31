@@ -166,6 +166,8 @@ export default function DashboardClient({
         <CreditCardWidget
           creditCards={creditCards}
           installments={installments}
+          wallets={wallets}
+          categories={categories}
           onRefresh={() => { }}
         />
       </div>
@@ -173,7 +175,7 @@ export default function DashboardClient({
       <Separator />
 
       <div className="grid gap-4">
-        <RecentTransactions transactions={filteredTransactions} categories={categories} wallets={wallets} />
+        <RecentTransactions transactions={filteredTransactions} categories={categories} wallets={wallets} creditCards={creditCards} />
       </div>
     </div>
   );

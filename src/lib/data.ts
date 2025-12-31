@@ -6,7 +6,8 @@ export const getTransactions = async (userId: string): Promise<Transaction[]> =>
     where: { wallet: { userId } },
     include: {
       category: true,
-      creditCard: true
+      creditCard: true,
+      wallet: true
     },
   });
   return transactions;
@@ -373,15 +374,98 @@ const processCreditCardPurchaseTx = async (tx: any, transaction: any) => {
 };
 
 export const updateTransaction = async (updatedTransaction: Omit<Transaction, 'category' | 'createdAt' | 'updatedAt'>): Promise<Transaction | null> => {
-  const transaction = await prisma.transaction.update({
+  // Get the old transaction first
+  const oldTransaction = await prisma.transaction.findUnique({
     where: { id: updatedTransaction.id },
-    data: {
-      ...updatedTransaction,
-      type: updatedTransaction.type === 'transfer' ? 'expense' : updatedTransaction.type, // Convert transfer to expense for DB
-    },
-    include: { category: true },
+    include: { creditCard: true }
   });
-  return transaction as Transaction | null;
+
+  if (!oldTransaction) {
+    throw new Error('Transaction not found');
+  }
+
+  // Process the update within a transaction to handle credit card changes
+  const result = await prisma.$transaction(async (tx) => {
+    // REVERSE OLD TRANSACTION EFFECTS
+    // If old transaction was using a credit card, restore the credit limit
+    if (oldTransaction.creditCardId && oldTransaction.type === 'expense') {
+      const oldCreditCard = await tx.creditCard.findUnique({
+        where: { id: oldTransaction.creditCardId }
+      });
+
+      if (oldCreditCard) {
+        console.log(`💳 Restoring credit limit for edited transaction:`);
+        console.log(`   Credit Card: ${oldCreditCard.name}`);
+        console.log(`   Amount to restore: Rp${oldTransaction.amount.toLocaleString()}`);
+
+        await tx.creditCard.update({
+          where: { id: oldTransaction.creditCardId },
+          data: {
+            usedLimit: {
+              decrement: oldTransaction.amount
+            }
+          }
+        });
+      }
+    }
+
+    // APPLY NEW TRANSACTION EFFECTS
+    // If new transaction uses credit card, process it
+    if (updatedTransaction.fundSource === 'credit-card' && updatedTransaction.creditCardId && updatedTransaction.type === 'expense') {
+      const creditCard = await tx.creditCard.findUnique({
+        where: { id: updatedTransaction.creditCardId }
+      });
+
+      if (!creditCard) {
+        throw new Error('Credit card not found');
+      }
+
+      // VALIDATION: Check if purchase would exceed limit
+      const availableLimit = creditCard.totalLimit - creditCard.usedLimit;
+      if (updatedTransaction.amount > availableLimit) {
+        throw new Error(
+          `Purchase declined: Amount (Rp${updatedTransaction.amount.toLocaleString()}) exceeds available credit limit (Rp${availableLimit.toLocaleString()}) for card "${creditCard.name}"`
+        );
+      }
+
+      // Increase the used limit (purchase adds debt)
+      await tx.creditCard.update({
+        where: { id: updatedTransaction.creditCardId },
+        data: {
+          usedLimit: {
+            increment: updatedTransaction.amount
+          }
+        }
+      });
+
+      console.log(`💳 Credit card purchase (fund source): Rp${updatedTransaction.amount.toLocaleString()}`);
+    }
+
+    // Update the transaction record
+    // Extract only the fields that exist in the database schema
+    const { fundSource, ...transactionData } = updatedTransaction as any;
+
+    // If fund source is wallet, clear the creditCardId
+    // If fund source is credit-card, ensure creditCardId is set
+    const finalData = {
+      ...transactionData,
+      type: updatedTransaction.type === 'transfer' ? 'expense' : updatedTransaction.type, // Convert transfer to expense for DB
+    };
+
+    if (fundSource === 'wallet') {
+      finalData.creditCardId = null;
+    }
+
+    const transaction = await tx.transaction.update({
+      where: { id: updatedTransaction.id },
+      data: finalData,
+      include: { category: true },
+    });
+
+    return transaction;
+  });
+
+  return result as Transaction | null;
 };
 
 export const deleteTransaction = async (id: string): Promise<boolean> => {

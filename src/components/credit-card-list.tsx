@@ -34,15 +34,32 @@ interface Installment {
   };
 }
 
-export default function CreditCardList() {
-  const [creditCards, setCreditCards] = useState<CreditCard[]>([]);
-  const [installments, setInstallments] = useState<Installment[]>([]);
-  const [loading, setLoading] = useState(true);
+interface CreditCardListProps {
+  initialWallets?: any[];
+  initialCategories?: any[];
+  initialCreditCards?: CreditCard[];
+  initialInstallments?: Installment[];
+}
+
+export default function CreditCardList({
+  initialWallets = [],
+  initialCategories = [],
+  initialCreditCards = [],
+  initialInstallments = []
+}: CreditCardListProps) {
+  const [creditCards, setCreditCards] = useState<CreditCard[]>(initialCreditCards);
+  const [installments, setInstallments] = useState<Installment[]>(initialInstallments);
+  const [wallets, setWallets] = useState<any[]>(initialWallets);
+  const [categories, setCategories] = useState<any[]>(initialCategories);
+  const [loading, setLoading] = useState(false); // Don't show loading since we have initial data
   const [showForm, setShowForm] = useState(false);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchData();
+    // Only fetch if we don't have initial data
+    if (initialCreditCards.length === 0) {
+      fetchData();
+    }
   }, []);
 
   const fetchData = async () => {
@@ -61,6 +78,20 @@ export default function CreditCardList() {
       if (instRes.ok) {
         const instData = await instRes.json();
         setInstallments(instData);
+      }
+
+      // Fetch wallets
+      const walletsRes = await fetch('/api/wallets');
+      if (walletsRes.ok) {
+        const walletsData = await walletsRes.json();
+        setWallets(walletsData);
+      }
+
+      // Fetch categories
+      const catRes = await fetch('/api/categories');
+      if (catRes.ok) {
+        const catData = await catRes.json();
+        setCategories(catData);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -94,7 +125,7 @@ export default function CreditCardList() {
     if (!confirm('Are you sure you want to delete this credit card?')) return;
 
     try {
-      const res = await fetch(`/api/credit-cards?id=${id}`, {
+      const res = await fetch(`/api/credit-cards/${id}`, {
         method: 'DELETE',
       });
 
@@ -112,10 +143,10 @@ export default function CreditCardList() {
 
   const handleUpdateCard = async (id: string, updates: any) => {
     try {
-      const res = await fetch('/api/credit-cards', {
+      const res = await fetch(`/api/credit-cards/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, ...updates }),
+        body: JSON.stringify(updates),
       });
 
       if (res.ok) {
@@ -147,6 +178,8 @@ export default function CreditCardList() {
       <CreditCardWidget
         creditCards={creditCards}
         installments={installments}
+        wallets={wallets}
+        categories={categories}
         onAddCard={() => setShowForm(true)}
         onDeleteCard={handleDeleteCard}
         onUpdateCard={handleUpdateCard}
@@ -183,6 +216,9 @@ export default function CreditCardList() {
                 <CreditCardTransactions
                   creditCardId={card.id}
                   creditCardName={card.name}
+                  wallets={wallets}
+                  categories={categories}
+                  creditCards={creditCards}
                 />
               </CollapsibleContent>
             </Collapsible>
