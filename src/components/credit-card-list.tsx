@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import CreditCardWidget from './credit-card-widget';
-import { InstallmentList } from './installment-list';
 import { CreditCardForm } from './credit-card-form';
 import { CreditCardTransactions } from './credit-card-transactions';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -183,10 +182,8 @@ export default function CreditCardList({
         onAddCard={() => setShowForm(true)}
         onDeleteCard={handleDeleteCard}
         onUpdateCard={handleUpdateCard}
+        onRefresh={fetchData}
       />
-
-      {/* Installments Section */}
-      <InstallmentList installments={installments} creditCards={creditCards} />
 
       {/* Per-Card Transaction Lists */}
       {creditCards.length > 0 && (

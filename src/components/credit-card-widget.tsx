@@ -2,18 +2,20 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { CreditCard, Calendar, TrendingDown, Wallet, Edit, Trash2, MoreVertical } from 'lucide-react';
+import { CreditCard, Calendar, TrendingDown, Wallet, Edit, Trash2, MoreVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { CreditCardForm } from './credit-card-form';
 import { InstallmentList } from './installment-list';
 import { CreditCardPaymentForm } from './credit-card-payment-form';
+import { CreditCardMonthlyBilling } from './credit-card-monthly-billing';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface CreditCardData {
   id: string;
@@ -61,6 +63,7 @@ export default function CreditCardWidget({
   const [selectedCard, setSelectedCard] = useState<CreditCardData | null>(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [paymentCard, setPaymentCard] = useState<CreditCardData | null>(null);
+  const [expandedBillingCardId, setExpandedBillingCardId] = useState<string | null>(null);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -239,6 +242,44 @@ export default function CreditCardWidget({
           })
         )}
       </div>
+
+      {/* Monthly Billing Section - Show for each card */}
+      {creditCards.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Monthly Billing</h3>
+          {creditCards.map((card) => (
+            <Collapsible
+              key={`billing-${card.id}`}
+              open={expandedBillingCardId === card.id}
+              onOpenChange={(open) => setExpandedBillingCardId(open ? card.id : null)}
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-between h-auto py-3"
+                >
+                  <span className="flex items-center gap-2">
+                    <CreditCard className="h-4 w-4" />
+                    {card.name} - Monthly Bill
+                  </span>
+                  {expandedBillingCardId === card.id ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-4">
+                <CreditCardMonthlyBilling
+                  creditCardId={card.id}
+                  creditCardName={card.name}
+                  billingDate={card.billingDate}
+                />
+              </CollapsibleContent>
+            </Collapsible>
+          ))}
+        </div>
+      )}
 
       {/* Installments Section */}
       {installments.length > 0 && (
