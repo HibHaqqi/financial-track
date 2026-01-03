@@ -794,16 +794,23 @@ export const getCreditCardMonthlyBilling = async (
   });
 
   // Get active installments and their monthly payments for this period
-  // Installments are counted in monthly billing regardless of when they started
+  // IMPORTANT: Only count installments that were ACTIVE during this billing period
+  // An installment contributes its monthlyPayment to billing if:
+  // - It started on or before the billing period ends (startDate <= periodEnd)
+  // - It hasn't been fully paid off yet (currentInstallment < tenor)
   const activeInstallments = await prisma.installment.findMany({
     where: {
       creditCardId,
-      currentInstallment: { lt: prisma.installment.fields.tenor }
+      currentInstallment: { lt: prisma.installment.fields.tenor },
+      // Only include installments that started on or before this billing period ends
+      startDate: {
+        lte: periodEnd,
+      }
     },
   });
 
-  // For monthly billing, we count ALL active installments' monthly payments
-  // because the customer pays the installment every month
+  // For monthly billing, each active installment contributes exactly 1 × monthlyPayment
+  // This represents the installment payment due for this billing period
   const totalInstallmentPayments = activeInstallments.reduce(
     (sum, inst) => sum + inst.monthlyPayment,
     0
