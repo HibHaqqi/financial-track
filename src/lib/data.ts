@@ -794,24 +794,73 @@ export const getCreditCardMonthlyBilling = async (
   });
 
   // Get active installments and their monthly payments for this period
-  // IMPORTANT: Only count installments that were ACTIVE during this billing period
-  // An installment contributes its monthlyPayment to billing if:
-  // - It started on or before the billing period ends (startDate <= periodEnd)
-  // - It hasn't been fully paid off yet (currentInstallment < tenor)
+  // IMPORTANT: Installments should only appear in billing periods AFTER the month they started
+  // Example: If installment starts Dec 15, it should appear in Jan billing (not Dec)
+  // This is because the first installment payment is due in the NEXT billing cycle
+  //
+  // We need to compare the INSTALLMENT START MONTH with the BILLING MONTH
+  // - Billing month for Dec billing = December
+  // - Installment starts Dec 15 = December
+  // - Result: Should NOT appear in Dec billing, only starting from Jan billing
   const activeInstallments = await prisma.installment.findMany({
     where: {
       creditCardId,
       currentInstallment: { lt: prisma.installment.fields.tenor },
-      // Only include installments that started on or before this billing period ends
-      startDate: {
-        lte: periodEnd,
-      }
     },
+  });
+
+  // Filter installments to only include those that:
+  // 1. Started BEFORE this billing period ENDS
+  // 2. Haven't completed their tenor yet
+  const billingInstallments = activeInstallments.filter(inst => {
+    const instStart = new Date(inst.startDate);
+
+    // Calculate how many billing periods have passed since installment started
+    const getBillingPeriod = (date: Date) => {
+      const billingDate = creditCard.billingDate;
+      const year = date.getFullYear();
+      const month = date.getMonth(); // 0-indexed
+      const day = date.getDate();
+
+      let billingYear = year;
+      let billingMonth = month;
+
+      if (day >= billingDate) {
+        billingMonth = month + 1;
+        if (billingMonth > 11) {
+          billingMonth = 0;
+          billingYear = year + 1;
+        }
+      }
+
+      return { year: billingYear, month: billingMonth };
+    };
+
+    const currentBilling = getBillingPeriod(new Date(year, month - 1, billingDate));
+    const startBilling = getBillingPeriod(instStart);
+
+    // Calculate billing periods passed
+    const yearDiff = currentBilling.year - startBilling.year;
+    const monthDiff = currentBilling.month - startBilling.month;
+    const billingPeriodsPassed = (yearDiff * 12) + monthDiff;
+
+    // Only include if we haven't exceeded the tenor
+    // Example: Layar started Nov 2025, 6 months
+    // - In current billing period (Jan 2026), 2 periods have passed (Dec, Jan)
+    // - 2 <= 6, so still active -> INCLUDED
+    // - In July 2026, 8 periods have passed
+    // - 8 > 6, so completed -> NOT INCLUDED
+    const isActive = billingPeriodsPassed < inst.tenor;
+
+    // Also check that installment started on or before billing period ends
+    const startedInTime = instStart <= periodEnd;
+
+    return isActive && startedInTime;
   });
 
   // For monthly billing, each active installment contributes exactly 1 × monthlyPayment
   // This represents the installment payment due for this billing period
-  const totalInstallmentPayments = activeInstallments.reduce(
+  const totalInstallmentPayments = billingInstallments.reduce(
     (sum, inst) => sum + inst.monthlyPayment,
     0
   );

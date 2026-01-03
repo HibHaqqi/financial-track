@@ -83,16 +83,83 @@ export function InstallmentList({ installments, creditCards, onRefresh, userId }
         }).format(amount);
     };
 
+    const getExpectedInstallmentNumber = (installment: InstallmentData) => {
+        // Find the credit card for this installment to get billing date
+        const card = creditCards.find(c => c.id === installment.creditCardId);
+        if (!card) return installment.currentInstallment;
+
+        const billingDate = card.billingDate;
+        const startDate = new Date(installment.startDate);
+        const currentDate = new Date();
+
+        // Helper function to get the billing period that contains a given date
+        const getBillingPeriod = (date: Date) => {
+            const year = date.getFullYear();
+            const month = date.getMonth(); // 0-indexed
+            const day = date.getDate();
+
+            // Billing period START date
+            // Example: billingDate 4
+            // Dec 5 or later: December billing (Dec 4 - Jan 3) - wait, that's wrong!
+            // Let me recalculate: If billingDate is 4, then billing period is:
+            // Previous month 4th to current month 3rd
+            // Example: December billing = Nov 4 to Dec 3
+
+            let billingYear = year;
+            let billingMonth = month;
+
+            if (day >= billingDate) {
+                // Day is on or after billing date, so it's in the NEXT billing period
+                // Example: Dec 5 with billingDate 4 = December billing period
+                // Actually no - Dec 5 means the statement was generated on Dec 4
+                // So Dec 5 is AFTER Dec 4, which means we're in the period that will be billed on Jan 4
+                billingMonth = month + 1;
+                if (billingMonth > 11) {
+                    billingMonth = 0;
+                    billingYear = year + 1;
+                }
+            }
+            // If day < billingDate, we're in the current billing period (nothing to change)
+
+            return { year: billingYear, month: billingMonth };
+        };
+
+        // Get current billing period
+        const currentBilling = getBillingPeriod(currentDate);
+
+        // Get the billing period that contains the installment start date
+        const startBilling = getBillingPeriod(startDate);
+
+        // Calculate billing periods difference
+        const yearDiff = currentBilling.year - startBilling.year;
+        const monthDiff = currentBilling.month - startBilling.month;
+        const billingPeriodsDiff = (yearDiff * 12) + monthDiff;
+
+        // Expected installment number - add 1 to show "next" payment
+        // If we're in the billing period showing payment 1, display should show 2/6 (working towards payment 2)
+        const expectedInstallment = Math.max(0, billingPeriodsDiff + 1);
+
+        // Use the greater of: expected progress or actual currentInstallment (manual payments)
+        const actualProgress = Math.max(expectedInstallment, installment.currentInstallment);
+
+        // Don't exceed the tenor
+        return Math.min(actualProgress, installment.tenor);
+    };
+
     const getInstallmentProgress = (installment: InstallmentData) => {
-        return (installment.currentInstallment / installment.tenor) * 100;
+        const currentInstallment = getExpectedInstallmentNumber(installment);
+        return (currentInstallment / installment.tenor) * 100;
     };
 
     const getRemainingMonths = (installment: InstallmentData) => {
-        return installment.tenor - installment.currentInstallment;
+        const currentInstallment = getExpectedInstallmentNumber(installment);
+        return installment.tenor - currentInstallment;
     };
 
     const isCompleted = (installment: InstallmentData) => {
-        return installment.currentInstallment >= installment.tenor;
+        // Check if installment is completed based on calculated progress
+        const expectedInstallment = getExpectedInstallmentNumber(installment);
+        return expectedInstallment >= installment.tenor;
     };
 
     const activeInstallments = installments.filter(i => !isCompleted(i));
@@ -139,7 +206,7 @@ export function InstallmentList({ installments, creditCards, onRefresh, userId }
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <Badge variant="secondary">
-                                                {installment.currentInstallment}/{installment.tenor} months
+                                                {getExpectedInstallmentNumber(installment)}/{installment.tenor} months
                                             </Badge>
                                             <Button
                                                 variant="ghost"
