@@ -15,7 +15,7 @@ Go to: **Repository Settings → Secrets → Actions**
 | `VPS_PASSWORD` | SSH password | `your_password` |
 | `VPS_PORT` | SSH port (optional) | `22` |
 | `PROJECT_PATH` | Project path on VPS | `/home/hibhaqqi/code/Financetrack` |
-| `APP_URL` | Application URL | `fintrack.3devnest.site` |
+| `APP_URL` | Application URL | `fintrack.dandelionkos.site` |
 
 ### Make sure your VPS has:
 
