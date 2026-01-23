@@ -26,7 +26,8 @@ jobs:
           # Navigate to project directory
           cd ${{ secrets.PROJECT_PATH || '/home/hibhaqqi/code/Financetrack' }}
 
-          echo "Step 1: Pulling latest changes..."
+          echo "Step 1: Updating git remote and pulling latest changes..."
+          git remote set-url origin https://git.dandelionkos.site/hibhaqqi/Financetrack.git
           git fetch origin
           git reset --hard origin/master
           git pull origin master
