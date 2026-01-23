@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
 import { format } from 'date-fns';
+import { BlurredAmount } from './blurred-amount';
 
 interface MonthlyBillingData {
   period: string;
@@ -135,7 +136,7 @@ export function CreditCardMonthlyBilling({
               Purchases
             </div>
             <div className="text-xl font-bold">
-              {formatCurrency(billing.purchases)}
+              <BlurredAmount amount={formatCurrency(billing.purchases)} />
             </div>
           </div>
 
@@ -145,7 +146,7 @@ export function CreditCardMonthlyBilling({
               Installments
             </div>
             <div className="text-xl font-bold">
-              {formatCurrency(billing.installmentPayments)}
+              <BlurredAmount amount={formatCurrency(billing.installmentPayments)} />
             </div>
           </div>
 
@@ -155,7 +156,7 @@ export function CreditCardMonthlyBilling({
               Payments
             </div>
             <div className="text-xl font-bold text-green-600">
-              -{formatCurrency(billing.payments)}
+              -<BlurredAmount amount={formatCurrency(billing.payments)} />
             </div>
           </div>
         </div>
@@ -164,7 +165,7 @@ export function CreditCardMonthlyBilling({
         <div className="bg-white p-6 rounded-lg border-2 border-blue-300">
           <div className="text-sm text-muted-foreground mb-2">Total Bill (Tagihan)</div>
           <div className="text-4xl font-bold text-blue-600">
-            {formatCurrency(billing.totalBill)}
+            <BlurredAmount amount={formatCurrency(billing.totalBill)} />
           </div>
           <div className="text-xs text-muted-foreground mt-2">
             Purchases + Installments - Payments

@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { BlurredAmount } from './blurred-amount';
 
 interface CreditCardData {
   id: string;
@@ -117,7 +118,7 @@ export default function CreditCardWidget({
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-orange-600">
-              {formatCurrency(getTotalMonthlyInstallment())}
+              <BlurredAmount amount={formatCurrency(getTotalMonthlyInstallment())} />
             </div>
             <p className="text-sm text-muted-foreground mt-1">
               {installments.filter(i => i.currentInstallment <= i.tenor).length} active installment(s)
@@ -215,7 +216,7 @@ export default function CreditCardWidget({
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Available</span>
                       <span className="font-semibold text-green-600">
-                        {formatCurrency(availableLimit)}
+                        <BlurredAmount amount={formatCurrency(availableLimit)} />
                       </span>
                     </div>
                     <Progress
@@ -223,8 +224,8 @@ export default function CreditCardWidget({
                       className="h-2"
                     />
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Used: {formatCurrency(card.usedLimit)}</span>
-                      <span>Limit: {formatCurrency(card.totalLimit)}</span>
+                      <span>Used: <BlurredAmount amount={formatCurrency(card.usedLimit)} /></span>
+                      <span>Limit: <BlurredAmount amount={formatCurrency(card.totalLimit)} /></span>
                     </div>
                   </div>
 

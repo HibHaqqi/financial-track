@@ -8,6 +8,7 @@ import { Calendar, CreditCard, TrendingDown, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { BlurredAmount } from './blurred-amount';
 
 interface InstallmentData {
     id: string;
@@ -227,7 +228,7 @@ export function InstallmentList({ installments, creditCards, onRefresh, userId }
                                                 {remaining} month(s) remaining
                                             </span>
                                             <span className="font-semibold">
-                                                {formatCurrency(installment.monthlyPayment)}/month
+                                                <BlurredAmount amount={formatCurrency(installment.monthlyPayment)} />/month
                                             </span>
                                         </div>
                                     </div>
@@ -235,7 +236,7 @@ export function InstallmentList({ installments, creditCards, onRefresh, userId }
                                     {/* Amount Info */}
                                     <div className="flex justify-between items-center pt-2 border-t text-sm">
                                         <span className="text-muted-foreground">Total Amount</span>
-                                        <span className="font-bold">{formatCurrency(installment.totalAmount)}</span>
+                                        <span className="font-bold"><BlurredAmount amount={formatCurrency(installment.totalAmount)} /></span>
                                     </div>
                                 </div>
                             );
@@ -267,7 +268,7 @@ export function InstallmentList({ installments, creditCards, onRefresh, userId }
                                                 {installment.description}
                                             </h4>
                                             <p className="text-xs text-muted-foreground mt-1">
-                                                {card?.name} • {installment.tenor} months • {formatCurrency(installment.totalAmount)}
+                                                {card?.name} • {installment.tenor} months • <BlurredAmount amount={formatCurrency(installment.totalAmount)} />
                                             </p>
                                         </div>
                                         <Badge variant="outline" className="text-green-600 border-green-600">
