@@ -70,6 +70,16 @@ export function CreditCardPaymentForm({
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     startSubmittingTransition(async () => {
+      // Validate: Cannot pay more than the current balance
+      if (values.amount > creditCard.usedLimit) {
+        toast({
+          title: 'Payment Amount Exceeds Balance',
+          description: `You can only pay up to Rp${creditCard.usedLimit.toLocaleString('id-ID')}. Current balance: Rp${creditCard.usedLimit.toLocaleString('id-ID')}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       // Create transaction with automatic payment description
       const transaction = {
         description: `Credit Card Payment - ${creditCard.name}`,
@@ -118,17 +128,22 @@ export function CreditCardPaymentForm({
 
         <div className="bg-muted p-3 rounded-lg mb-4">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Current Balance:</span>
-            <span className="font-semibold">
+            <span className="text-muted-foreground">Current Debt:</span>
+            <span className="font-semibold text-red-600">
               Rp{creditCard.usedLimit.toLocaleString('id-ID')}
             </span>
           </div>
           <div className="flex justify-between text-sm mt-1">
-            <span className="text-muted-foreground">Available Limit:</span>
+            <span className="text-muted-foreground">Available to Pay:</span>
             <span className="font-semibold text-green-600">
-              Rp{(creditCard.totalLimit - creditCard.usedLimit).toLocaleString('id-ID')}
+              Rp{creditCard.usedLimit.toLocaleString('id-ID')}
             </span>
           </div>
+          {creditCard.usedLimit === 0 && (
+            <div className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
+              ⚠️ This card has no debt. No payment needed.
+            </div>
+          )}
         </div>
 
         <Form {...form}>

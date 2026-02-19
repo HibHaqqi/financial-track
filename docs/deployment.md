@@ -67,7 +67,7 @@ cat .env
 **Your `.env` should contain:**
 ```env
 DATABASE_URL=postgresql://postgres:rahasia@bizkos-db:5432/financetrack
-NEXTAUTH_URL=https://fintrack.3devnest.site
+NEXTAUTH_URL=https://fintrack.dandelionkos.site
 NEXTAUTH_SECRET=jdjdjjdkldldurhchq
 
 POSTGRES_DB=financetrack
@@ -138,10 +138,10 @@ docker exec -it financetrack npx prisma generate
 
 ```bash
 # Check application health
-curl https://fintrack.3devnest.site/api/health
+curl https://fintrack.dandelionkos.site/api/health
 
 # Or check the application directly
-curl https://fintrack.3devnest.site
+curl https://fintrack.dandelionkos.site
 
 # Check database tables were created
 docker exec -it bizkos-db psql -U postgres -d financetrack -c "\dt"

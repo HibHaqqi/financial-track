@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import CategoryIcon from "./category-icon";
+import { BlurredAmount } from "./blurred-amount";
 
 interface SummaryCardProps {
   title: string;
@@ -41,9 +42,15 @@ export default function SummaryCard({ title, value, iconName, isCurrency = true 
         <CategoryIcon name={iconName} className="h-4 w-4 text-muted-foreground flex-shrink-0" />
       </CardHeader>
       <CardContent className="flex flex-col justify-center pb-4 pt-0 px-4 overflow-hidden">
-        <div className={`text-xl sm:text-2xl font-bold ${textColor()} truncate`}>
-          {formattedValue}
-        </div>
+        {isCurrency ? (
+          <div className={`text-xl sm:text-2xl font-bold ${textColor()} truncate`}>
+            <BlurredAmount amount={formattedValue} />
+          </div>
+        ) : (
+          <div className={`text-xl sm:text-2xl font-bold ${textColor()} truncate`}>
+            {formattedValue}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

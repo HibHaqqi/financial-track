@@ -619,14 +619,62 @@ export const getCreditCards = async (userId: string) => {
   // Calculate usedLimit for each card from actual transactions (NOT from stored value)
   const cardsWithCalculatedLimit = await Promise.all(
     creditCards.map(async (card) => {
-      const transactions = await prisma.transaction.findMany({
+      // Get purchases (transactions with this creditCardId)
+      const purchaseTransactions = await prisma.transaction.findMany({
         where: {
           creditCardId: card.id,
           type: 'expense',
         },
       });
 
-      const usedLimit = transactions.reduce((sum, t) => sum + t.amount, 0);
+      // Get potential payments (expenses without creditCardId)
+      const allExpensesWithoutCard = await prisma.transaction.findMany({
+        where: {
+          creditCardId: null,
+          type: 'expense',
+        },
+      });
+
+      // Filter to find payments for this specific card (by description matching)
+      const paymentPatterns = [
+        new RegExp(`credit\\s+card\\s+payment\\s*[-:]\\s*${card.name}`, 'i'),
+        new RegExp(`bayar\\s+kartu\\s+kredit\\s*[-:]\\s*${card.name}`, 'i'),
+        new RegExp(`pembayaran\\s+kartu\\s+kredit\\s*[-:]\\s*${card.name}`, 'i'),
+        new RegExp(`cc\\s+${card.name}`, 'i'),  // Also match "Cc BCA juli" pattern
+      ];
+
+      const paymentTransactions = allExpensesWithoutCard.filter(t =>
+        paymentPatterns.some(pattern => pattern.test(t.description))
+      );
+
+      // Get active installments for this card
+      const activeInstallments = await prisma.installment.findMany({
+        where: {
+          creditCardId: card.id,
+          currentInstallment: { lt: prisma.installment.fields.tenor }
+        },
+      });
+
+      // Calculate: Purchases ADD to usedLimit, Payments SUBTRACT from usedLimit
+      let usedLimit = 0;
+
+      // Add all purchases
+      for (const t of purchaseTransactions) {
+        usedLimit += t.amount;
+      }
+
+      // Add active installment total amounts (they block the credit limit)
+      for (const inst of activeInstallments) {
+        usedLimit += inst.totalAmount;
+      }
+
+      // Subtract all payments
+      for (const t of paymentTransactions) {
+        usedLimit -= t.amount;
+      }
+
+      // Ensure usedLimit never goes negative
+      usedLimit = Math.max(0, usedLimit);
 
       return {
         ...card,
@@ -636,6 +684,228 @@ export const getCreditCards = async (userId: string) => {
   );
 
   return cardsWithCalculatedLimit;
+};
+
+// Calculate monthly bill (tagihan) for a specific billing period
+interface MonthlyBilling {
+  period: string; // Format: "MMM yyyy" e.g., "Dec 2025"
+  purchases: number;
+  installmentPayments: number;
+  payments: number;
+  totalBill: number; // purchases + installmentPayments - payments
+}
+
+export const getCreditCardMonthlyBilling = async (
+  creditCardId: string,
+  year: number,
+  month: number
+): Promise<MonthlyBilling | null> => {
+  const creditCard = await prisma.creditCard.findUnique({
+    where: { id: creditCardId },
+  });
+
+  if (!creditCard) return null;
+
+  // Calculate billing period start and end dates based on billingDate
+  // billingDate is the day of month when statement is generated (e.g., 25)
+  // Billing period for month M: from billingDate of month M-1 to billingDate-1 of month M
+  // This crosses month boundaries, and can cross year boundaries too!
+  // Example: December bill (month=12, year=2025) with billingDate=25 covers:
+  //   Start: Nov 25, 2025 00:00:00
+  //   End: Dec 24, 2025 23:59:59
+  // Example: January bill (month=1, year=2026) with billingDate=25 covers:
+  //   Start: Dec 25, 2025 00:00:00
+  //   End: Jan 24, 2026 23:59:59
+
+  const billingDate = creditCard.billingDate; // e.g., 25
+
+  // Create start date: billingDate of the PREVIOUS month
+  let startYear = year;
+  let startMonth = month - 2; // month is 1-indexed, so we need month-2 for previous month
+
+  if (startMonth < 0) {
+    // Crosses year boundary (January billing period starts in December of previous year)
+    startYear = year - 1;
+    startMonth = 11; // December
+  }
+
+  const periodStart = new Date(startYear, startMonth, billingDate, 0, 0, 0, 0);
+
+  // Create end date: billingDate-1 of the CURRENT month
+  let endDay = billingDate - 1;
+  const periodEnd = new Date(year, month - 1, endDay, 23, 59, 59, 999);
+
+  // Handle edge case where billingDate is 1 (first day of month)
+  // Then periodEnd would be day 0 of the month, which is the last day of previous month
+  if (billingDate === 1) {
+    periodEnd.setDate(0); // Last day of previous month
+    periodEnd.setHours(23, 59, 59, 999);
+  }
+
+  // Debug logging
+  console.log(`[Billing Debug] Card: ${creditCard.name}, Billing Date: ${billingDate}`);
+  console.log(`[Billing Debug] Querying period for ${month}/${year}:`);
+  console.log(`[Billing Debug] Start: ${periodStart.toISOString()} (${periodStart.toLocaleDateString('id-ID')})`);
+  console.log(`[Billing Debug] End: ${periodEnd.toISOString()} (${periodEnd.toLocaleDateString('id-ID')})`);
+  console.log(`[Billing Debug] Today: ${new Date().toISOString()} (${new Date().toLocaleDateString('id-ID')})`);
+
+  // Get purchases within the billing period (regular purchases, not installments)
+  // Note: Installments are tracked separately and don't create transaction records for each month
+  console.log(`[Billing Debug] Querying transactions with:`, {
+    creditCardId,
+    type: 'expense',
+    dateRange: {
+      gte: periodStart.toISOString(),
+      lte: periodEnd.toISOString(),
+    }
+  });
+
+  const purchaseTransactions = await prisma.transaction.findMany({
+    where: {
+      creditCardId,
+      type: 'expense',
+      date: {
+        gte: periodStart,
+        lte: periodEnd,
+      },
+    },
+  });
+
+  console.log(`[Billing Debug] Raw query result: ${purchaseTransactions.length} transactions`);
+
+  // DEBUG: Check ALL transactions for this card (without date filter)
+  const allCardTransactions = await prisma.transaction.findMany({
+    where: {
+      creditCardId,
+      type: 'expense',
+    },
+  });
+  console.log(`[Billing Debug] ALL transactions for this card: ${allCardTransactions.length}`);
+  allCardTransactions.forEach(t => {
+    console.log(`[Billing Debug] ALL - ${t.description}: Rp${t.amount.toLocaleString('id-ID')} on ${new Date(t.date).toISOString()}`);
+  });
+
+  const totalPurchases = purchaseTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+  console.log(`[Billing Debug] Found ${purchaseTransactions.length} purchase transactions`);
+  console.log(`[Billing Debug] Total purchases: ${totalPurchases}`);
+  purchaseTransactions.forEach(t => {
+    console.log(`[Billing Debug] - ${t.description}: Rp${t.amount.toLocaleString('id-ID')} on ${new Date(t.date).toISOString()}`);
+  });
+
+  // Get active installments and their monthly payments for this period
+  // IMPORTANT: Installments should only appear in billing periods AFTER the month they started
+  // Example: If installment starts Dec 15, it should appear in Jan billing (not Dec)
+  // This is because the first installment payment is due in the NEXT billing cycle
+  //
+  // We need to compare the INSTALLMENT START MONTH with the BILLING MONTH
+  // - Billing month for Dec billing = December
+  // - Installment starts Dec 15 = December
+  // - Result: Should NOT appear in Dec billing, only starting from Jan billing
+  const activeInstallments = await prisma.installment.findMany({
+    where: {
+      creditCardId,
+      currentInstallment: { lt: prisma.installment.fields.tenor },
+    },
+  });
+
+  // Filter installments to only include those that:
+  // 1. Started BEFORE this billing period ENDS
+  // 2. Haven't completed their tenor yet
+  const billingInstallments = activeInstallments.filter(inst => {
+    const instStart = new Date(inst.startDate);
+
+    // Calculate how many billing periods have passed since installment started
+    const getBillingPeriod = (date: Date) => {
+      const billingDate = creditCard.billingDate;
+      const year = date.getFullYear();
+      const month = date.getMonth(); // 0-indexed
+      const day = date.getDate();
+
+      let billingYear = year;
+      let billingMonth = month;
+
+      if (day >= billingDate) {
+        billingMonth = month + 1;
+        if (billingMonth > 11) {
+          billingMonth = 0;
+          billingYear = year + 1;
+        }
+      }
+
+      return { year: billingYear, month: billingMonth };
+    };
+
+    const currentBilling = getBillingPeriod(new Date(year, month - 1, billingDate));
+    const startBilling = getBillingPeriod(instStart);
+
+    // Calculate billing periods passed
+    const yearDiff = currentBilling.year - startBilling.year;
+    const monthDiff = currentBilling.month - startBilling.month;
+    const billingPeriodsPassed = (yearDiff * 12) + monthDiff;
+
+    // Only include if we haven't exceeded the tenor
+    // Example: Layar started Nov 2025, 6 months
+    // - In current billing period (Jan 2026), 2 periods have passed (Dec, Jan)
+    // - 2 <= 6, so still active -> INCLUDED
+    // - In July 2026, 8 periods have passed
+    // - 8 > 6, so completed -> NOT INCLUDED
+    const isActive = billingPeriodsPassed < inst.tenor;
+
+    // Also check that installment started on or before billing period ends
+    const startedInTime = instStart <= periodEnd;
+
+    return isActive && startedInTime;
+  });
+
+  // For monthly billing, each active installment contributes exactly 1 × monthlyPayment
+  // This represents the installment payment due for this billing period
+  const totalInstallmentPayments = billingInstallments.reduce(
+    (sum, inst) => sum + inst.monthlyPayment,
+    0
+  );
+
+  // Get payments made within the billing period
+  const allExpensesWithoutCard = await prisma.transaction.findMany({
+    where: {
+      creditCardId: null,
+      type: 'expense',
+      date: {
+        gte: periodStart,
+        lte: periodEnd,
+      },
+    },
+  });
+
+  // Filter to find payments for this specific card
+  const paymentPatterns = [
+    new RegExp(`credit\\s+card\\s+payment\\s*[-:]\\s*${creditCard.name}`, 'i'),
+    new RegExp(`bayar\\s+kartu\\s+kredit\\s*[-:]\\s*${creditCard.name}`, 'i'),
+    new RegExp(`pembayaran\\s+kartu\\s+kredit\\s*[-:]\\s*${creditCard.name}`, 'i'),
+    new RegExp(`cc\\s+${creditCard.name}`, 'i'),
+  ];
+
+  const paymentTransactions = allExpensesWithoutCard.filter(t =>
+    paymentPatterns.some(pattern => pattern.test(t.description))
+  );
+
+  const totalPayments = paymentTransactions.reduce((sum, t) => sum + t.amount, 0);
+
+  // Calculate total bill: purchases + installmentPayments - payments
+  const totalBill = totalPurchases + totalInstallmentPayments - totalPayments;
+
+  const periodLabel = new Date(year, month - 1).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+  });
+
+  return {
+    period: periodLabel,
+    purchases: totalPurchases,
+    installmentPayments: totalInstallmentPayments,
+    payments: totalPayments,
+    totalBill: Math.max(0, totalBill), // Ensure non-negative
+  };
 };
 
 export const getCreditCardById = async (id: string, userId: string) => {

@@ -37,6 +37,7 @@ import TransactionForm from './transaction-form';
 import { deleteTransaction } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { BlurredAmount } from './blurred-amount';
 
 
 interface RecentTransactionsProps {
@@ -139,7 +140,7 @@ export default function RecentTransactions({
                             }`}
                           >
                             {tx.type === 'income' ? '+' : '-'}
-                            {new Intl.NumberFormat('id-ID').format(tx.amount)}
+                            <BlurredAmount amount={new Intl.NumberFormat('id-ID').format(tx.amount)} />
                           </div>
                         </div>
                       </div>
@@ -264,7 +265,7 @@ export default function RecentTransactions({
                       }`}
                     >
                       {tx.type === 'income' ? '+' : '-'}
-                      {new Intl.NumberFormat('id-ID').format(tx.amount)}
+                      <BlurredAmount amount={new Intl.NumberFormat('id-ID').format(tx.amount)} />
                     </TableCell>
                     <TableCell className="text-right">
                        <Dialog open={dialogOpen[tx.id]} onOpenChange={(open) => handleDialogChange(tx.id, open)}>

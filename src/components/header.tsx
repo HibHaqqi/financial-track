@@ -10,11 +10,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { CircleUser, LogOut, CirclePlus, Landmark, Tag, CreditCard } from 'lucide-react';
+import { CircleUser, LogOut, CirclePlus, Landmark, Tag, CreditCard, Eye, EyeOff } from 'lucide-react';
 import Logo from './logo';
 import { signOut } from 'next-auth/react';
+import { useBlur } from '@/contexts/blur-context';
 
 export default function Header() {
+  const { isBlurred, toggleBlur } = useBlur();
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
@@ -27,6 +30,22 @@ export default function Header() {
                 <span className="hidden sm:inline">Add Transaction</span>
               </Link>
             </Button>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={toggleBlur}
+              className="relative"
+              title={isBlurred ? 'Show amounts' : 'Hide amounts'}
+            >
+              {isBlurred ? (
+                <EyeOff className="h-5 w-5" />
+              ) : (
+                <Eye className="h-5 w-5" />
+              )}
+              <span className="sr-only">Toggle blur</span>
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="secondary" size="icon" className="rounded-full">

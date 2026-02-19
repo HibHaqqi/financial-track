@@ -31,14 +31,14 @@ export default function DashboardClient({
 }: DashboardClientProps) {
   const isMobile = useIsMobile();
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
-  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+  const [selectedYear, setSelectedYear] = useState<string>('all');
   const [selectedWalletId, setSelectedWalletId] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(tx => {
       const txDate = new Date(tx.date);
-      const yearMatch = txDate.getFullYear() === parseInt(selectedYear);
+      const yearMatch = selectedYear === 'all' || txDate.getFullYear() === parseInt(selectedYear);
       const monthMatch = selectedMonth === 'all' || txDate.getMonth() + 1 === parseInt(selectedMonth);
       const walletMatch = selectedWalletId === 'all' || tx.walletId === selectedWalletId;
       return yearMatch && monthMatch && walletMatch;
@@ -48,7 +48,7 @@ export default function DashboardClient({
   const allTimeTransactions = useMemo(() => {
     return transactions.filter(tx => {
       const txDate = new Date(tx.date);
-      const yearMatch = txDate.getFullYear() === parseInt(selectedYear);
+      const yearMatch = selectedYear === 'all' || txDate.getFullYear() === parseInt(selectedYear);
       const walletMatch = selectedWalletId === 'all' || tx.walletId === selectedWalletId;
       return yearMatch && walletMatch;
     })
@@ -69,10 +69,11 @@ export default function DashboardClient({
 
   const years = useMemo(() => {
     if (transactions.length === 0) {
-      return [new Date().getFullYear()];
+      return ['all', new Date().getFullYear()];
     }
     const allYears = transactions.map(tx => new Date(tx.date).getFullYear());
-    return [...new Set(allYears)].sort((a, b) => b - a);
+    const uniqueYears = [...new Set(allYears)].sort((a, b) => b - a);
+    return ['all', ...uniqueYears];
   }, [transactions]);
 
   const months = [
@@ -90,6 +91,10 @@ export default function DashboardClient({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
           {selectedWalletId === 'all' ? 'Overall Dashboard' : `${wallets.find(w => w.id === selectedWalletId)?.name} Dashboard`}
+          {selectedYear !== 'all' && selectedMonth === 'all' && ` - ${selectedYear}`}
+          {selectedYear !== 'all' && selectedMonth !== 'all' && ` - ${months.find(m => m.value === selectedMonth)?.label} ${selectedYear}`}
+          {selectedYear === 'all' && selectedMonth === 'all' && ' - All Time'}
+          {selectedYear === 'all' && selectedMonth !== 'all' && ` - ${months.find(m => m.value === selectedMonth)?.label} (All Years)`}
         </h1>
 
         {/* Mobile filter toggle button */}
@@ -136,7 +141,9 @@ export default function DashboardClient({
             </SelectTrigger>
             <SelectContent>
               {years.map(year => (
-                <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                <SelectItem key={year} value={year.toString()}>
+                  {year === 'all' ? 'All Years' : year}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
